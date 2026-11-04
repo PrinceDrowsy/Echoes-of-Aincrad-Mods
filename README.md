@@ -21,8 +21,14 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Key | Action |
 |---|---|
 | Ctrl+F5 | Log quest, Death Game and map state |
+| Ctrl+F6 | Log `CanSwitch` and call `PlaySwitchAction` if it's allowed |
+| Ctrl+F7 | Show a test chat message with custom text |
 | Ctrl+F8 | Start the quest set in `START_QUEST` |
 | Ctrl+F9 | Complete the current quest |
+
+## Docs
+
+- `docs/performance-notes.md` - performance measurements
 
 ## Game install
 

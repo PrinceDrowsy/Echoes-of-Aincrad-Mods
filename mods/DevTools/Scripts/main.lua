@@ -31,6 +31,37 @@ bind(Key.F5, "state", function(pc)
     log("map=" .. pc:GetWorld():GetFullName())
 end)
 
+local CAN_SWITCH = { [0] = "OK", "FailAttacking", "FailNoPartner", "FailNoTarget", "FailVoiceWait", "FailCantAction", "FailCantAttack" }
+bind(Key.F6, "switch", function()
+    local hero = FindFirstOf("RODHeroCharacter")
+    if not (hero and hero:IsValid()) then
+        log("no hero")
+        return
+    end
+    local result = hero:CanSwitch()
+    log("CanSwitch=" .. tostring(CAN_SWITCH[result] or result))
+    if result == 0 then
+        hero:PlaySwitchAction()
+    end
+end)
+
+bind(Key.F7, "chat message", function()
+    local cockpit = FindFirstOf("RODCockpitWidgetBase")
+    if not (cockpit and cockpit:IsValid()) then
+        log("no cockpit")
+        return
+    end
+    cockpit:OnChatMessageReceivedDelegate({
+        UniqueID = 900001,
+        MessageLogKind = 0,
+        Message = FText("Papa, this message came from a mod!"),
+        Sender = FText("Yui"),
+        Address = FText(""),
+        ChatTargetKind = 0,
+        bUnread = true,
+    })
+end)
+
 bind(Key.F8, "start quest " .. START_QUEST, function(pc)
     pc:DebugQuestStart(START_QUEST, true)
 end)
