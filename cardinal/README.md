@@ -1,12 +1,24 @@
 # Cardinal - The Cardinal System
 
-A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.1 reads the game; editing and building mods come later.
+A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.2 reads the game and builds data mods from your changes.
 
 - **Tables:** browse the game's items, recipes, enemies, skills, quests and every other data table, with English text next to each text key. Search, and export to CSV or JSON.
-- **Map:** see each floor from above, cell by cell, colored by region. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details.
+- **Editing and mod building:** change values right in the tables, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
+- **Map:** see each floor from above, cell by cell, colored by region, plus the HLOD grids the game draws in the distance. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details.
 - **Command line:** everything the window does, scriptable, for batch work and AI assistants.
 
-Cardinal only reads your own copy of the game. It never changes the game's files, and it doesn't contain any of them.
+Cardinal reads your own copy of the game and never changes the game's own files. Mods it builds are new files in `Paks\~mods`, so deleting them undoes them. It doesn't contain any of the game's files.
+
+## Making a mod
+
+1. Open a table and double-click a value. Numbers, text, true or false, and choices can be changed; lists and groups can't yet. Cardinal checks each value against the game file before taking it, and changed values turn yellow.
+2. Every change collects in the **Mod** tab, with its original value. Select changes there to revert them, or type the original value back into the table.
+3. Give the mod a name, version and author, and **Save project**. The project is a small JSON file holding only your changes (see below), so it can be rebuilt after a game update.
+4. **Build mod into a folder** or **Build and install into ~mods**. Cardinal pulls fresh copies of the files it changes from the unmodded game, applies your changes, and packs them into `<Name>_9999_P.utoc`, `.ucas` and `.pak`.
+
+Builds always start from the unmodded game, never from other installed mods. Two mods that change the same game file still overwrite each other; the patch layer that lets them stack comes later.
+
+Some tables are read-only for now: the enemy blueprint list and quests (Cardinal can't write those back yet), and any table whose file can't be decoded with your mappings. The Tables tab says why. Mappings written for your exact game version, by Cardinal Mappings, usually fix the second kind.
 
 ## Setup
 
@@ -21,7 +33,7 @@ Then press **Save and open the game files**.
 
 ## Command line
 
-Any arguments run Cardinal without the window. Commands use the saved settings; `--paks`, `--key`, `--usmap` and `--oodle` override them for one run.
+Any arguments run Cardinal without the window. Commands use the saved settings; `--paks`, `--key`, `--usmap` and `--oodle` override them for one run. `--with-mods` reads the game as the mods installed in `Paks\~mods` change it, instead of unmodded.
 
 ```
 Cardinal.exe setup [--paks DIR] [--key HEX] [--usmap FILE] [--oodle FILE] [--download-oodle]
@@ -30,22 +42,43 @@ Cardinal.exe list floors
 Cardinal.exe list layers WL02
 Cardinal.exe export tables --out DIR [--only Items/MaterialItem,Skills/DT_ActiveSkillList]
 Cardinal.exe export map WL02|all --out DIR
+Cardinal.exe set PROJECT.json TABLE ROW FIELD VALUE
+Cardinal.exe build PROJECT.json --out DIR
+Cardinal.exe build PROJECT.json --install [--force]
 Cardinal.exe help
 ```
+
+- `list tables` prints each table's id, source and `editable` or `read-only`.
+- `set` checks one change against the game file and saves it in the project, creating the project if it doesn't exist. `FIELD` is the column name as the table shows it, such as `CoolTime` or `QuestData.Floor`. Setting a field back to its original value removes the change. Example: `Cardinal.exe set MyMod.json Skills/DT_ActiveSkillList 0 CoolTime 2.5`.
+- `build` checks every change first and builds nothing if any is wrong. `--install` builds straight into `Paks\~mods` and refuses to replace an earlier build of the same mod unless you add `--force`.
 
 Output goes to stdout, errors to stderr. Exit codes:
 
 | Code | Meaning |
 |---|---|
 | 0 | Done |
-| 1 | Bad arguments, unknown command or unknown table |
-| 2 | Setup missing or wrong (paks, key, mappings, Oodle), or the files didn't open with that key |
+| 1 | Bad arguments, unknown command, table or row, or a change that can't be made (wrong type, read-only table) |
+| 2 | Setup missing or wrong (paks, key, mappings, Oodle, retoc), or the files didn't open with that key |
 | 3 | Something couldn't be found or read in the game files. `export tables` still writes the rest and lists failures in `tables.json` |
-| 4 | Writing the output failed |
+| 4 | Writing the output failed, or `build --install` found an earlier build without `--force` |
+
+## Mod projects
+
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 1.
+
+```json
+{ "formatVersion": 1, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "",
+  "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ] }
+```
+
+- `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
+- `value`: the new value as text. Enum values can be written with or without their type, as `Crystal02` or `EDropGimmick::Crystal02`.
+- `original`: the unmodded value when the change was made, for reference. Builds don't need it.
+- The built files are named after `name`: letters, digits, dashes and underscores, plus `_9999_P`. The patch number makes the mod load after the game's own patch (`pakchunk0-WindowsClient_0_P`); with a plain `_P`, Unreal ranks the two the same and either copy could win. A name that already ends in `_<number>_P` is kept as it is.
 
 ## Export formats
 
-Field names are stable within a `formatVersion`. Cardinal 0.1 writes version 1.
+Field names are stable within a `formatVersion`. Cardinal writes version 1.
 
 ### Tables
 
@@ -107,8 +140,10 @@ The CSVs hold the same cells and markers flat. `layers` in the cells CSV is join
 
 Needs the .NET 10 SDK. `build.ps1` keeps the SDK and every NuGet and .NET cache under `CARDINAL_TOOLS` (default `D:\dev-tools`) and temp files under `CARDINAL_SCRATCH` (default `obj\scratch`); set those to change where they go.
 
-`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters. `src/Cardinal` is the window and the command line, and both call the same core code.
+Building mods needs `retoc.exe` beside `Cardinal.exe`. The project copies it from `..\tools\retoc\retoc.exe` (not committed), or from the path in the `RetocExe` MSBuild property. retoc downloads `oo2core_9_win64.dll` next to itself the first time it runs; `publish` deletes any such copy so it never ships.
+
+`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects and building (UAssetAPI edits the extracted files, retoc extracts and packs them). `src/Cardinal` is the window and the command line, and both call the same core code.
 
 ## Credits
 
-Built on [CUE4Parse](https://github.com/FabianFG/CUE4Parse). See `THIRD_PARTY_NOTICES.md`.
+Built on [CUE4Parse](https://github.com/FabianFG/CUE4Parse), [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [retoc](https://github.com/trumank/retoc). See `THIRD_PARTY_NOTICES.md`.

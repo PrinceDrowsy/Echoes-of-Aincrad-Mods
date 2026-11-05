@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <PackageReference Include="CUE4Parse" Version="1.2.2.202611" />
+    <PackageReference Include="UAssetAPI" Version="1.1.0" />
     <!-- CUE4Parse pulls in 9.0.0, which has a published vulnerability. -->
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.14" />
   </ItemGroup>

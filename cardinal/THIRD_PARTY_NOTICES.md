@@ -8,6 +8,14 @@ Cardinal reads the game's files with [CUE4Parse](https://github.com/FabianFG/CUE
 
 Libraries credited in that NOTICE and bundled with Cardinal: Berrysoft.XXTea, Blake3, BouncyCastle.Cryptography, FixedMathSharp, Fmod5Sharp, GenericReader, Infrablack.UE4Config, K4os.Compression.LZ4, LZMA-SDK, Newtonsoft.Json, OffiUtils, Oodle.NET, Serilog, SubstreamSharp, VGAudio, Zlib-ng.NET and ZstdSharp.Port.
 
+## UAssetAPI
+
+Cardinal edits game assets for mods with [UAssetAPI](https://github.com/atenfyr/UAssetAPI) 1.1.0 by atenfyr, licensed under the MIT License (`licenses/UAssetAPI-LICENSE.txt`), bundled inside `Cardinal.exe`. Its dependencies, Newtonsoft.Json and ZstdSharp.Port, are already credited above.
+
+## retoc
+
+Cardinal builds mods with [retoc](https://github.com/trumank/retoc) by Truman Kilen and Archengius, licensed under the MIT License (`licenses/retoc-LICENSE.txt`). It ships unchanged as `retoc.exe` beside `Cardinal.exe`, which runs it as a separate program. The first time it needs Oodle, retoc downloads `oo2core_9_win64.dll` next to itself.
+
 ## Other libraries
 
 | Library | License | Copyright |
@@ -49,4 +57,4 @@ SOFTWARE.
 
 ## Not included
 
-Cardinal ships no game files, no encryption key, no mappings file and no Oodle library. The Oodle library is either chosen by the player or downloaded on request from the [OodleUE](https://github.com/WorkingRobot/OodleUE) builds, through CUE4Parse's own downloader.
+Cardinal ships no game files, no encryption key, no mappings file and no Oodle library. Cardinal's own Oodle library is either chosen by the player or downloaded on request from the [OodleUE](https://github.com/WorkingRobot/OodleUE) builds, through CUE4Parse's own downloader. retoc fetches its own copy, as described above.

@@ -68,6 +68,13 @@ public sealed class Settings
             yield return "The Oodle library isn't set. Choose one, or download it from the setup screen.";
     }
 
+    /// <summary>The key as 0x followed by hex digits, the form CUE4Parse and retoc both take.</summary>
+    public string HexKey()
+    {
+        var key = AesKey!.Trim();
+        return key.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? key : "0x" + key;
+    }
+
     static bool IsValidKey(string? key)
     {
         var hex = key?.Trim();

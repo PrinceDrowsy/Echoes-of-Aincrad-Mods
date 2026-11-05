@@ -7,6 +7,7 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 # Features
 
 - **Data browser:** items, enemies, skills, quests and every other data table in the game, 218 tables in all, shown as plain tables with English names pulled from the game's own text. Search any of them, and export them to CSV or JSON.
+- **Editing and one-button mod building:** double-click a value in the tables to change it, and build your changes into an installable mod with one button, or drop it straight into your mods folder. (ﾉ´ヮ`)ﾉ*: ･ﾟ
 - **Map viewer:** both floors, drawn from the game's own map data, with every region in its own color. Zoom, pan, and hover over any spot to see what's there.
 - **Developer layers:** the game shipped with some of its level designers' planning notes still inside it, like how big each kind of fight is meant to be, where chests go, where the barriers sit, and the color legend for their rough layouts. Tick them on and off in a checklist to see how the floors were planned. (・∀・)
 - **Command line:** every export also works without the window, so scripts can pull the game's data straight into your own projects. The file formats are documented in the README.
@@ -14,7 +15,6 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 
 # Planned Features
 
-- Editing values in the tables, and building them into an installable mod with one button.
 - A patch layer, so mods only store their own changes and can stack instead of overwriting each other.
 - A conflict map that shows which of your installed mods change which parts of each floor.
 - Outfit fitting for body replacers, in the spirit of BodySlide and Outfit Studio.
@@ -26,7 +26,7 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 
 - Windows, 64-bit.
 - Echoes of Aincrad.
-- The game's AES key. Cardinal can't include it (´・ω・`), so you'll need to get it from your own copy with [AESDumpster](https://github.com/GHFear/AESDumpster). Cardinal explains how on its setup screen.
+- The game's AES key. Cardinal can't include it (´・ω・`), so you'll need to get it from your own copy with [AESDumpster](https://github.com/GHFear/AESDumpster/releases). Cardinal explains how on its setup screen.
 - **Optional:** [UE4SS](https://www.nexusmods.com/echoesofaincrad/mods/7), for the Cardinal Mappings companion mod.
 
 # Installation

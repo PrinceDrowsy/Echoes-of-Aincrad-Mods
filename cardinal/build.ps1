@@ -39,8 +39,13 @@ switch ($Command) {
     'build' { & $dotnet build "$PSScriptRoot\Cardinal.slnx" -v q -nologo }
     'publish' {
         $out = "$PSScriptRoot\publish"
+        # Publishing over an earlier single-file publish drops WPF's native DLLs, so always start empty.
+        if (Test-Path $out) { Remove-Item $out -Recurse -Force }
         & $dotnet publish $app -c Release -o $out -v q -nologo
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        if (-not (Test-Path "$out\retoc.exe")) { Write-Warning 'retoc.exe was not found (tools\retoc, or set RetocExe), so this build cannot make mods.' }
+        # retoc downloads Oodle beside itself when run; a copy left from testing must never ship.
+        Get-ChildItem $out -Filter 'oo2core*.dll' | Remove-Item
         New-Item -ItemType Directory -Force "$out\licenses" | Out-Null
         Copy-Item "$PSScriptRoot\README.md", "$PSScriptRoot\THIRD_PARTY_NOTICES.md" $out
         Copy-Item "$PSScriptRoot\licenses\*" "$out\licenses"

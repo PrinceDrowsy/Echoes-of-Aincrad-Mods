@@ -84,9 +84,11 @@
                             <TextBlock DockPanel.Dock="Left" Text="Search" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <TextBox x:Name="SearchBox" TextChanged="SearchChanged" />
                         </DockPanel>
-                        <TextBlock x:Name="TableInfo" DockPanel.Dock="Top" Margin="6,0,6,4" Foreground="Gray" />
-                        <DataGrid x:Name="Grid" IsReadOnly="True" AutoGenerateColumns="False" EnableRowVirtualization="True"
-                                  EnableColumnVirtualization="True" HeadersVisibility="Column" CanUserAddRows="False" />
+                        <TextBlock x:Name="TableInfo" DockPanel.Dock="Top" Margin="6,0,6,0" Foreground="Gray" />
+                        <TextBlock x:Name="EditInfo" DockPanel.Dock="Top" Margin="6,0,6,4" Foreground="Gray" TextWrapping="Wrap" />
+                        <DataGrid x:Name="Grid" AutoGenerateColumns="False" EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                                  HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False" SelectionUnit="Cell"
+                                  BeginningEdit="CellEditStarting" CellEditEnding="CellEdited" />
                     </DockPanel>
                 </Grid>
             </TabItem>
@@ -101,6 +103,8 @@
                         <StackPanel DockPanel.Dock="Top">
                             <TextBlock Text="Floor" FontWeight="Bold" />
                             <ComboBox x:Name="FloorBox" Margin="0,2,0,8" SelectionChanged="FloorSelected" />
+                            <TextBlock Text="Grid" FontWeight="Bold" />
+                            <ComboBox x:Name="GridBox" Margin="0,2,0,8" SelectionChanged="GridSelected" />
                             <TextBlock Text="Grid level" FontWeight="Bold" />
                             <ComboBox x:Name="LevelBox" Margin="0,2,0,8" SelectionChanged="LevelSelected" />
                             <Button Content="Export this floor..." Padding="8,2" Margin="0,0,0,8" Click="ExportMap" />
@@ -116,6 +120,56 @@
                         <local:MapView x:Name="Map" />
                     </Border>
                 </Grid>
+            </TabItem>
+
+            <TabItem Header="Mod" x:Name="ModTab" IsEnabled="False">
+                <DockPanel Margin="12">
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
+                        Edit values in the Tables tab (double-click a cell) and they collect here. A project only stores your changes,
+                        so it can be rebuilt after a game update, and every build starts from the unmodded game.
+                    </TextBlock>
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition />
+                            <RowDefinition />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,2,6,2" />
+                        <TextBox x:Name="ModNameBox" Grid.Column="1" Margin="0,2,12,2" TextChanged="ModDetailsChanged" />
+                        <TextBlock Text="Version" Grid.Column="2" VerticalAlignment="Center" Margin="0,2,6,2" />
+                        <TextBox x:Name="ModVersionBox" Grid.Column="3" Margin="0,2,0,2" TextChanged="ModDetailsChanged" />
+                        <TextBlock Text="Author" Grid.Row="1" VerticalAlignment="Center" Margin="0,2,6,2" />
+                        <TextBox x:Name="ModAuthorBox" Grid.Row="1" Grid.Column="1" Margin="0,2,12,2" TextChanged="ModDetailsChanged" />
+                        <TextBlock Text="Description" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="0,2,6,2" />
+                        <TextBox x:Name="ModDescriptionBox" Grid.Row="1" Grid.Column="3" Margin="0,2,0,2" TextChanged="ModDetailsChanged" />
+                    </Grid>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button Content="New project" Padding="8,2" Margin="0,0,4,4" Click="NewProject" />
+                        <Button Content="Open project..." Padding="8,2" Margin="0,0,4,4" Click="OpenProject" />
+                        <Button Content="Save project" Padding="8,2" Margin="0,0,4,4" Click="SaveProject" />
+                        <Button Content="Save project as..." Padding="8,2" Margin="0,0,16,4" Click="SaveProjectAs" />
+                        <Button Content="Revert selected" Padding="8,2" Margin="0,0,16,4" Click="RevertSelected" />
+                        <Button Content="Build mod into a folder..." Padding="8,2" Margin="0,0,4,4" Click="BuildToFolder" />
+                        <Button Content="Build and install into ~mods" Padding="8,2" Margin="0,0,4,4" Click="BuildAndInstall" />
+                    </WrapPanel>
+                    <TextBlock x:Name="ModInfo" DockPanel.Dock="Top" Foreground="Gray" Margin="0,0,0,4" />
+                    <ListView x:Name="EditList" SelectionMode="Extended">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Table" Width="220" DisplayMemberBinding="{Binding Table}" />
+                                <GridViewColumn Header="Row" Width="140" DisplayMemberBinding="{Binding Row}" />
+                                <GridViewColumn Header="Field" Width="220" DisplayMemberBinding="{Binding Field}" />
+                                <GridViewColumn Header="Original" Width="160" DisplayMemberBinding="{Binding Original}" />
+                                <GridViewColumn Header="New value" Width="160" DisplayMemberBinding="{Binding Value}" />
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </DockPanel>
             </TabItem>
         </TabControl>
     </DockPanel>

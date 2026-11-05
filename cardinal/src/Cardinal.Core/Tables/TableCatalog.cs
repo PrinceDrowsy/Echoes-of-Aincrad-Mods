@@ -6,8 +6,14 @@ using Newtonsoft.Json.Linq;
 
 namespace Cardinal.Tables;
 
-/// <summary>A table Cardinal knows how to read, loaded only when asked for.</summary>
-public sealed record TableSource(string Group, string Name, string Source, Func<Game, Table> Load)
+/// <summary>
+/// Where a table's rows live in the game files: a DataTable, or one map property of a data asset.
+/// File is the path inside the game, such as EchoesofAincrad/Content/ROD/....uasset.
+/// </summary>
+public sealed record EditTarget(string File, string? Map);
+
+/// <summary>A table Cardinal knows how to read, loaded only when asked for. Tables without a target are read-only.</summary>
+public sealed record TableSource(string Group, string Name, string Source, Func<Game, Table> Load, EditTarget? Target = null)
 {
     /// <summary>A file-safe name used for exports, such as Items/MaterialItem.</summary>
     public string Id => $"{Group}/{Regex.Replace(Name, @"[^A-Za-z0-9_\-]", "")}";
@@ -33,11 +39,12 @@ public static class TableCatalog
             if (!curated.Add(path))
                 return;
             var name = Path.GetFileNameWithoutExtension(path);
-            sources.Add(new TableSource(group, name, AssetPath(path), g => DataTable(g, path, name)));
+            sources.Add(new TableSource(group, name, AssetPath(path), g => DataTable(g, path, name), new EditTarget(path, null)));
         }
 
         foreach (var map in ItemMaps(game))
-            sources.Add(new TableSource("Items", map, AssetPath(ItemDataAsset), g => ItemMap(g, map)));
+            sources.Add(new TableSource("Items", map, AssetPath(ItemDataAsset), g => ItemMap(g, map),
+                new EditTarget(ItemDataAsset, map + "DataAsMap")));
         foreach (var path in game.FindFiles(DataAssets + "Games/DataTables/DT_ShopItemList", ".uasset"))
             AddDataTable("Items", path);
 

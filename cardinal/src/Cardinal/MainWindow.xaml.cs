@@ -1,11 +1,15 @@
+﻿using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using Cardinal.Maps;
+using Cardinal.Mods;
 using Cardinal.Tables;
 using Microsoft.Win32;
+using Newtonsoft.Json.Linq;
+using UAssetAPI.Unversioned;
 
 namespace Cardinal;
 
@@ -20,13 +24,25 @@ public partial class MainWindow : Window
         Color.FromRgb(210, 150, 190), Color.FromRgb(120, 100, 60),
     ];
     static readonly Brush DeveloperBrush = new SolidColorBrush(Color.FromRgb(255, 140, 40));
+    static readonly Brush ChangedBrush = new SolidColorBrush(Color.FromRgb(255, 236, 150));
 
     Settings settings = Settings.Load();
     Game? game;
+    TableSource? source;
     Table? table;
+    List<GridRow> rows = [];
     FloorMap? floor;
     readonly Dictionary<(string Floor, string Layer), IReadOnlyList<MapMarker>> markerCache = [];
     readonly SemaphoreSlim gate = new(1, 1);
+
+    // Assets parsed for editing, by game file. Several item tables share one asset.
+    readonly Dictionary<string, EditableAsset> assets = [];
+    Usmap? mappings;
+
+    ModProject project = new();
+    string? projectPath;
+    bool dirty;
+    bool showingProject;
 
     public MainWindow()
     {
@@ -36,7 +52,9 @@ public partial class MainWindow : Window
         MappingsBox.Text = settings.MappingsFile ?? "";
         OodleBox.Text = settings.OodleFile ?? "";
         Map.Hover += text => Status.Text = text;
+        Closing += ConfirmClose;
         Closed += (_, _) => game?.Dispose();
+        ShowProject();
     }
 
     // Game reads run one at a time off the UI thread; clicks made meanwhile wait their turn.
@@ -51,7 +69,7 @@ public partial class MainWindow : Window
         }
         catch (Exception e)
         {
-            Status.Text = e.Message;
+            Status.Text = e.Message.Split(Environment.NewLine)[0];
             MessageBox.Show(this, e.Message, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Warning);
             return default;
         }
@@ -123,33 +141,168 @@ public partial class MainWindow : Window
         game?.Dispose();
         game = opened.Game;
         markerCache.Clear();
+        assets.Clear();
+        mappings = null;
         var view = new ListCollectionView(opened.Tables.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TableSource.Group)));
         TableList.ItemsSource = view;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
-        TablesTab.IsEnabled = MapTab.IsEnabled = true;
+        TablesTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = true;
         Status.Text = $"Opened. {opened.Tables.Count} tables and {opened.Floors.Count} floors found.";
         Tabs.SelectedItem = TablesTab;
     }
 
     async void TableSelected(object sender, SelectionChangedEventArgs e)
     {
-        if (game is null || TableList.SelectedItem is not TableSource source)
+        if (game is null || TableList.SelectedItem is not TableSource selected)
             return;
-        if (await Run($"Reading {source.Name}...", () => source.Load(game)) is not { } loaded)
+        if (await Run($"Reading {selected.Name}...", () => selected.Load(game)) is not { } loaded)
             return;
+        source = selected;
         table = loaded;
         Grid.Columns.Clear();
         for (var i = 0; i < loaded.Columns.Count; i++)
-            Grid.Columns.Add(new DataGridTextColumn
-            {
-                Header = loaded.Columns[i].Replace("_", "__"),
-                Binding = new Binding($"[{i}]"),
-                MaxWidth = 420,
-            });
+            Grid.Columns.Add(Column(loaded.Columns[i], i));
+        ShowTable();
+        Status.Text = $"{selected.Group} / {selected.Name}";
+        await CheckEditable(selected);
+    }
+
+    static DataGridTextColumn Column(string header, int index)
+    {
+        var changed = new DataTrigger { Binding = new Binding($"Changed[{index}]"), Value = true };
+        changed.Setters.Add(new Setter(DataGridCell.BackgroundProperty, ChangedBrush));
+        changed.Setters.Add(new Setter(DataGridCell.ForegroundProperty, Brushes.Black));
+        var style = new Style(typeof(DataGridCell));
+        style.Triggers.Add(changed);
+        return new DataGridTextColumn
+        {
+            Header = header.Replace("_", "__"),
+            // Two-way only because a one-way column can't be edited at all. CellEdited decides what gets written back.
+            Binding = new Binding($"Cells[{index}]"),
+            CellStyle = style,
+            MaxWidth = 420,
+        };
+    }
+
+    // Rebuilds the grid rows from the unmodded table, then lays the project's changes on top.
+    void ShowTable()
+    {
+        if (table is null || source is null)
+            return;
+        rows = table.Cells.Select((cells, i) => new GridRow(i, (string[])cells.Clone())).ToList();
+        foreach (var edit in project.Edits.Where(e => e.Table == source.Id))
+            ShowEdit(edit, true);
         ShowRows();
-        Status.Text = $"{source.Group} / {source.Name}";
+    }
+
+    void ShowEdit(ModEdit edit, bool applied)
+    {
+        if (table is null || source?.Id != edit.Table)
+            return;
+        var column = table.Columns.ToList().IndexOf(edit.Field);
+        var row = rows.FirstOrDefault(r => table.Rows[r.Index].Key == edit.Row);
+        if (column > 0 && row is not null)
+            row.Set(column, applied ? edit.Value : table.Cells[row.Index][column], applied);
+    }
+
+    async Task CheckEditable(TableSource selected)
+    {
+        if (selected.Target is not { } target)
+        {
+            EditInfo.Text = "Read-only: Cardinal can't write this kind of table back yet.";
+            return;
+        }
+        EditInfo.Text = "Checking whether this table can be edited...";
+        if (!assets.ContainsKey(target.File))
+        {
+            var checkedAsset = await Run("Checking whether this table can be edited...", () =>
+            {
+                try
+                {
+                    return (Asset: EditableAsset.Load(settings, Mappings(), target.File), Error: (string?)null);
+                }
+                catch (Exception e)
+                {
+                    return (Asset: (EditableAsset?)null, Error: e.Message);
+                }
+            });
+            if (checkedAsset.Asset is null)
+            {
+                if (source == selected)
+                    EditInfo.Text = $"Read-only for now: {checkedAsset.Error}";
+                return;
+            }
+            assets[target.File] = checkedAsset.Asset;
+        }
+        if (source == selected)
+            EditInfo.Text = assets[target.File].Problem
+                            ?? "Double-click a value to change it. Changed values are highlighted and collect in the Mod tab.";
+    }
+
+    Usmap Mappings() => mappings ??= new Usmap(settings.MappingsFile!);
+
+    string? CantEdit(GridRow row, int column)
+    {
+        if (source?.Target is not { } target || table is null)
+            return "This table is read-only.";
+        if (!assets.TryGetValue(target.File, out var asset))
+            return "Still checking whether this table can be edited.";
+        if (asset.Problem is { } problem)
+            return problem;
+        if (column <= 0)
+            return "The row key can't be changed.";
+        var name = table.Columns[column];
+        if (table.Field(row.Index, name) is not JValue { Type: not JTokenType.Null })
+            return $"{name} can't be edited here. Only single values can be: numbers, text, true or false, and choices.";
+        return null;
+    }
+
+    void CellEditStarting(object sender, DataGridBeginningEditEventArgs e)
+    {
+        if (CantEdit((GridRow)e.Row.Item, Grid.Columns.IndexOf(e.Column)) is { } reason)
+        {
+            e.Cancel = true;
+            Status.Text = reason;
+        }
+    }
+
+    void CellEdited(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction != DataGridEditAction.Commit || source?.Target is not { } target || table is null
+            || e.EditingElement is not TextBox box)
+            return;
+        var row = (GridRow)e.Row.Item;
+        var column = Grid.Columns.IndexOf(e.Column);
+        var text = box.Text.Trim();
+        if (text == row.Cells[column])
+            return;
+
+        // The editor's text is what the binding writes into the row after this, so it's set to the value that should stay.
+        var original = table.Cells[row.Index][column];
+        var edit = new ModEdit(source.Id, table.Rows[row.Index].Key, table.Columns[column], text, original);
+        if (ModEdit.Same(text, original))
+        {
+            project.Remove(edit.Table, edit.Row, edit.Field);
+            box.Text = original;
+            row.Set(column, original, false);
+        }
+        else if (assets[target.File].Check(target, edit) is { } problem)
+        {
+            box.Text = row.Cells[column];
+            Status.Text = problem;
+            MessageBox.Show(this, problem, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        else
+        {
+            project.Set(edit);
+            box.Text = text;
+            row.Set(column, text, true);
+        }
+        MarkDirty();
+        Status.Text = $"{edit.Field} in row {edit.Row}: {original} -> {text}";
     }
 
     void SearchChanged(object sender, TextChangedEventArgs e) => ShowRows();
@@ -159,11 +312,11 @@ public partial class MainWindow : Window
         if (table is null)
             return;
         var search = SearchBox.Text.Trim();
-        var rows = search.Length == 0
-            ? table.Cells
-            : table.Cells.Where(r => r.Any(c => c.Contains(search, StringComparison.OrdinalIgnoreCase))).ToList();
-        Grid.ItemsSource = rows;
-        TableInfo.Text = $"{table.Source}  |  {rows.Count} of {table.Rows.Count} rows, {table.Columns.Count} columns";
+        var shown = search.Length == 0
+            ? rows
+            : rows.Where(r => r.Cells.Any(c => c.Contains(search, StringComparison.OrdinalIgnoreCase))).ToList();
+        Grid.ItemsSource = shown;
+        TableInfo.Text = $"{table.Source}  |  {shown.Count} of {table.Rows.Count} rows, {table.Columns.Count} columns";
     }
 
     string? ChooseFolder(string title)
@@ -174,11 +327,11 @@ public partial class MainWindow : Window
 
     async void ExportTable(object sender, RoutedEventArgs e)
     {
-        if (table is null || TableList.SelectedItem is not TableSource source || ChooseFolder("Export the table to") is not { } folder)
+        if (table is null || source is null || ChooseFolder("Export the table to") is not { } folder)
             return;
-        var current = table;
-        if (await Run("Exporting...", () => { Export.Table(current, folder, source.Name); return true; }))
-            Status.Text = $"Saved {source.Name}.json and {source.Name}.csv to {folder}";
+        var (current, name) = (table, source.Name);
+        if (await Run("Exporting...", () => { Export.Table(current, folder, name); return true; }))
+            Status.Text = $"Saved {name}.json and {name}.csv to {folder}. Exports show the unmodded game.";
     }
 
     async void ExportAllTables(object sender, RoutedEventArgs e)
@@ -191,6 +344,153 @@ public partial class MainWindow : Window
             var failed = results.Count(r => r.Error is not null);
             Status.Text = $"Exported {results.Count - failed} tables to {folder}" + (failed > 0 ? $", {failed} failed (see tables.json)" : "");
         }
+    }
+
+    void ShowProject()
+    {
+        showingProject = true;
+        ModNameBox.Text = project.Name;
+        ModVersionBox.Text = project.Version;
+        ModAuthorBox.Text = project.Author;
+        ModDescriptionBox.Text = project.Description;
+        showingProject = false;
+        ShowEdits();
+    }
+
+    void ShowEdits()
+    {
+        EditList.ItemsSource = project.Edits.ToList();
+        var file = projectPath is null ? "not saved yet" : projectPath;
+        ModInfo.Text = $"{project.Edits.Count} changes  |  builds as {project.FileName()}.utoc, .ucas and .pak  |  project: {file}";
+        Title = $"Cardinal - {project.Name}{(dirty ? " *" : "")}";
+    }
+
+    void MarkDirty()
+    {
+        dirty = true;
+        ShowEdits();
+    }
+
+    void ModDetailsChanged(object sender, TextChangedEventArgs e)
+    {
+        if (showingProject)
+            return;
+        project.Name = ModNameBox.Text.Trim();
+        project.Version = ModVersionBox.Text.Trim();
+        project.Author = ModAuthorBox.Text.Trim();
+        project.Description = ModDescriptionBox.Text.Trim();
+        MarkDirty();
+    }
+
+    bool DiscardOk() =>
+        !dirty || MessageBox.Show(this, "The mod project has unsaved changes. Discard them?", "Cardinal",
+            MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+    void ConfirmClose(object? sender, CancelEventArgs e) => e.Cancel = !DiscardOk();
+
+    void Replace(ModProject next, string? path)
+    {
+        project = next;
+        projectPath = path;
+        dirty = false;
+        ShowProject();
+        ShowTable();
+    }
+
+    void NewProject(object sender, RoutedEventArgs e)
+    {
+        if (DiscardOk())
+            Replace(new ModProject(), null);
+    }
+
+    void OpenProject(object sender, RoutedEventArgs e)
+    {
+        if (!DiscardOk())
+            return;
+        var dialog = new OpenFileDialog { Filter = "Cardinal mod project|*.json" };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        try
+        {
+            Replace(ModProject.Load(dialog.FileName), dialog.FileName);
+            Status.Text = $"Opened {dialog.FileName}";
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            MessageBox.Show(this, ex.Message, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    void SaveProject(object sender, RoutedEventArgs e)
+    {
+        if (projectPath is null)
+            SaveProjectAs(sender, e);
+        else
+            Save(projectPath);
+    }
+
+    void SaveProjectAs(object sender, RoutedEventArgs e)
+    {
+        var name = string.Concat(project.Name.Split(Path.GetInvalidFileNameChars()));
+        var dialog = new SaveFileDialog { Filter = "Cardinal mod project|*.json", FileName = (name.Length > 0 ? name : "MyMod") + ".json" };
+        if (dialog.ShowDialog(this) == true)
+            Save(dialog.FileName);
+    }
+
+    void Save(string path)
+    {
+        try
+        {
+            project.Save(path);
+            projectPath = path;
+            dirty = false;
+            ShowEdits();
+            Status.Text = $"Saved {path}";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, ex.Message, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    void RevertSelected(object sender, RoutedEventArgs e)
+    {
+        var selected = EditList.SelectedItems.Cast<ModEdit>().ToList();
+        if (selected.Count == 0)
+        {
+            Status.Text = "Select the changes to revert first.";
+            return;
+        }
+        foreach (var edit in selected)
+        {
+            project.Remove(edit.Table, edit.Row, edit.Field);
+            ShowEdit(edit, false);
+        }
+        MarkDirty();
+        Status.Text = $"Reverted {selected.Count} changes.";
+    }
+
+    async void BuildToFolder(object sender, RoutedEventArgs e)
+    {
+        if (game is null || ChooseFolder("Build the mod into") is not { } folder)
+            return;
+        var (current, building) = (game, project);
+        if (await Run("Building the mod...", () => ModBuilder.Build(current, settings, building, folder)) is { } files)
+            Status.Text = $"Built {string.Join(", ", files.Select(Path.GetFileName))} in {folder}";
+    }
+
+    async void BuildAndInstall(object sender, RoutedEventArgs e)
+    {
+        if (game is null)
+            return;
+        var existing = ModBuilder.Installed(settings, project);
+        if (existing.Count > 0 && MessageBox.Show(this,
+                $"{project.FileName()} is already installed in {ModBuilder.ModsFolder(settings)}. Replace it with this build?",
+                "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        var (current, building) = (game, project);
+        if (await Run("Building and installing the mod...", () => ModBuilder.Install(current, settings, building, true)) is { } files)
+            Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
     }
 
     async void FloorSelected(object sender, SelectionChangedEventArgs e)
@@ -214,9 +514,20 @@ public partial class MainWindow : Window
         foreach (var layer in map.Layers)
             AddLayerBox(layer.Name, layer.Developer ? $"{layer.Name} (developer)" : layer.Name, layer.CellCount, colors[layer.Name], !layer.Developer);
 
-        LevelBox.ItemsSource = MapView.Levels(map).ToList();
-        LevelBox.SelectedIndex = 0;
+        GridBox.ItemsSource = MapView.Grids(map).ToList();
+        GridBox.SelectedIndex = 0;
         Status.Text = $"{map.Id}: {map.Cells.Count} cells. Scroll to zoom, drag to pan, hover for details.";
+    }
+
+    void GridSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (floor is null || GridBox.SelectedItem is not string grid)
+            return;
+        Map.SetGrid(grid);
+        LevelBox.ItemsSource = MapView.Levels(floor, grid).ToList();
+        LevelBox.SelectedIndex = 0;
+        if (grid != MapView.MainGrid)
+            Status.Text = $"{grid}: HLOD cells, the simplified scenery the game draws in the distance.";
     }
 
     void AddLayerBox(string layer, string label, int cells, Brush? color, bool shown)

@@ -9,7 +9,7 @@
     <UseWPF>true</UseWPF>
     <StartupObject>Cardinal.Program</StartupObject>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>Cardinal</Product>
     <AssemblyTitle>Cardinal - The Cardinal System</AssemblyTitle>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -22,6 +22,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cardinal.Core\Cardinal.Core.csproj" />
+  </ItemGroup>
+
+  <!-- retoc (MIT) builds the mods and ships beside Cardinal.exe. It isn't committed; point RetocExe at a copy if it lives elsewhere. -->
+  <PropertyGroup>
+    <RetocExe Condition="'$(RetocExe)' == ''">$(MSBuildThisFileDirectory)..\..\..\tools\retoc\retoc.exe</RetocExe>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(RetocExe)')">
+    <None Include="$(RetocExe)" Link="retoc.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

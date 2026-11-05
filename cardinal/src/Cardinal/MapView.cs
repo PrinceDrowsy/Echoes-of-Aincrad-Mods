@@ -12,10 +12,11 @@ public sealed class MapView : FrameworkElement
     // Stands for cells that belong to no data layer.
     public const string NoLayer = "";
 
-    const string MainGrid = "MainGrid";
+    public const string MainGrid = "MainGrid";
     const double LabelZoom = 0.02;
 
     FloorMap? floor;
+    string grid = MainGrid;
     int level;
     readonly HashSet<string> visible = [];
     readonly Dictionary<string, IReadOnlyList<MapMarker>> markers = [];
@@ -26,8 +27,12 @@ public sealed class MapView : FrameworkElement
 
     public event Action<string>? Hover;
 
-    public static IEnumerable<int> Levels(FloorMap map) =>
-        map.Cells.Where(c => c.Grid == MainGrid).Select(c => c.Level).Distinct().Order();
+    /// <summary>The floor's grids, MainGrid first. The others hold HLOD cells, the simplified scenery drawn in the distance.</summary>
+    public static IEnumerable<string> Grids(FloorMap map) =>
+        map.Cells.Select(c => c.Grid).Distinct().OrderBy(g => g != MainGrid).ThenBy(g => g);
+
+    public static IEnumerable<int> Levels(FloorMap map, string grid) =>
+        map.Cells.Where(c => c.Grid == grid).Select(c => c.Level).Distinct().Order();
 
     public void Show(FloorMap map, IReadOnlyDictionary<string, Brush> layerColors)
     {
@@ -36,7 +41,15 @@ public sealed class MapView : FrameworkElement
         colors.Clear();
         foreach (var (name, brush) in layerColors)
             colors[name] = brush;
-        SetLevel(Levels(map).FirstOrDefault());
+        grid = MainGrid;
+        SetLevel(Levels(map, grid).FirstOrDefault());
+    }
+
+    public void SetGrid(string value)
+    {
+        grid = value;
+        if (floor is not null)
+            SetLevel(Levels(floor, grid).FirstOrDefault());
     }
 
     public void SetLevel(int value)
@@ -61,13 +74,13 @@ public sealed class MapView : FrameworkElement
     }
 
     IEnumerable<MapCell> VisibleCells() =>
-        floor?.Cells.Where(c => c.Grid == MainGrid && c.Level == level
+        floor?.Cells.Where(c => c.Grid == grid && c.Level == level
                                 && (c.Layers.Count == 0 ? visible.Contains(NoLayer) : c.Layers.All(visible.Contains))) ?? [];
 
     void Fit()
     {
         // Coarser levels hold a few huge cells, so fitting to every level would shrink the view.
-        var cells = floor?.Cells.Where(c => c.Grid == MainGrid && c.Level == level).ToList() ?? [];
+        var cells = floor?.Cells.Where(c => c.Grid == grid && c.Level == level).ToList() ?? [];
         if (cells.Count == 0 || ActualWidth == 0)
         {
             InvalidateVisual();

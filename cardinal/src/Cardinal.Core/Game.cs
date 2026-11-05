@@ -28,19 +28,23 @@ public sealed class Game : IDisposable
         this.textKeys = textKeys;
     }
 
-    public static Game Open(Settings settings)
+    /// <summary>
+    /// Opens the unmodded game by default. With installed mods included, files in Paks\~mods override the
+    /// originals as they do in game, which is what you want to inspect but never what an edit should start from.
+    /// </summary>
+    public static Game Open(Settings settings, bool withMods = false)
     {
         var problems = settings.Problems().ToList();
         if (problems.Count > 0)
             throw new SetupException(string.Join(Environment.NewLine, problems));
 
         OodleHelper.Initialize(settings.OodleFile);
-        var provider = new DefaultFileProvider(settings.PaksFolder!, SearchOption.TopDirectoryOnly,
+        var provider = new DefaultFileProvider(settings.PaksFolder!,
+            withMods ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly,
             new VersionContainer(EGame.GAME_UE5_3));
         provider.MappingsContainer = new FileUsmapTypeMappingsProvider(settings.MappingsFile!);
         provider.Initialize();
-        var key = settings.AesKey!.Trim();
-        provider.SubmitKey(new FGuid(), new FAesKey(key.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? key : "0x" + key));
+        provider.SubmitKey(new FGuid(), new FAesKey(settings.HexKey()));
         provider.PostMount();
 
         if (!provider.Files.ContainsKey(TextTablePath))
