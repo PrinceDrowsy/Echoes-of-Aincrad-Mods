@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Cardinal.Core/Cardinal.Core.csproj" />
+    <Project Path="src/Cardinal/Cardinal.csproj" />
+  </Folder>
+</Solution>
