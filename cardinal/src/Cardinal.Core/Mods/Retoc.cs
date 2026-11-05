@@ -5,7 +5,9 @@ namespace Cardinal.Mods;
 /// <summary>
 /// Runs retoc (Truman Kilen and Archengius, MIT), which ships beside Cardinal, to convert between the game's
 /// IoStore containers and the loose asset files UAssetAPI edits.
-/// retoc downloads Oodle (oo2core_9_win64.dll) next to itself the first time it needs it.
+/// retoc downloads Oodle (oo2core_9_win64.dll) next to itself the first time it needs it, from the same OodleUE
+/// builds as Cardinal's own download, and rejects any copy that doesn't match its pinned hash, so the player's own
+/// Oodle file can't be handed to it.
 /// </summary>
 public static class Retoc
 {

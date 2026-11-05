@@ -27,7 +27,7 @@ Run `Cardinal.exe`. The Setup tab asks for four things, saved in `%APPDATA%\Card
 1. **Game Paks folder:** `EchoesofAincrad\Content\Paks` in the game's install folder. **Detect** finds it in your Steam libraries.
 2. **AES key:** the game's files are encrypted, and Cardinal can't include the key. Run [AESDumpster](https://github.com/GHFear/AESDumpster) on `EchoesofAincrad-Win64-Shipping.exe` and paste the key it prints.
 3. **Mappings (.usmap):** describes the game's data layout. The easiest way is the Cardinal Mappings companion mod, an optional download on the same page: install it with UE4SS, start the game once and wait at the title screen for about 15 seconds, and Cardinal finds the file by itself. It writes new mappings after each game update. You can also make one by hand with UE4SS's `DumpUSMAP()` and choose it here.
-4. **Oodle library:** the files are compressed with Oodle, which Cardinal can't ship. **Download** fetches it from the [OodleUE](https://github.com/WorkingRobot/OodleUE) builds, as FModel does, or choose an `oo2core_9_win64.dll` or `oodle-data-shared.dll` you already have.
+4. **Oodle library:** the files are compressed with Oodle, which Cardinal can't ship. **Download** fetches it from the [OodleUE](https://github.com/WorkingRobot/OodleUE) builds, as FModel does, or choose an `oo2core_9_win64.dll` or `oodle-data-shared.dll` you already have. Building a mod also needs internet access the first time, because retoc fetches its own copy of Oodle from the same place, checked against a fixed hash.
 
 Then press **Save and open the game files**.
 
