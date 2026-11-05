@@ -70,4 +70,49 @@ bind(Key.F9, "complete current quest", function(pc)
     pc:DebugQuestSuccess()
 end)
 
+local MORPH_VALUES = { 1, 2, 3, -1, 0 }
+local BUILD_MORPHS = { "BS_BOD_Belly", "BS_BOD_Butt", "BS_BOD_Hips", "BS_BOD_Thighs", "BS_BOD_Arms", "BS_BOD_ForeArms", "BS_BOD_Legs" }
+local morphStep = 0
+
+local function logAppearance(hero)
+    local look = hero:GetAvatarData().AppearanceData
+    log(string.format("appearance belly=%s butt=%s hips=%s thighs=%s arms=%s forearms=%s legs=%s scale=%s",
+        look.Belly, look.Butts, look.Hips, look.Thighs, look.Arms, look.ForeArms, look.Legs, look.MeshScale))
+end
+
+-- Only changes the live meshes, so nothing here reaches the save.
+local function setMorphs(names)
+    local hero = FindFirstOf("RODHeroCharacter")
+    if not (hero and hero:IsValid()) then
+        log("no hero")
+        return
+    end
+    logAppearance(hero)
+    morphStep = morphStep % #MORPH_VALUES + 1
+    local value = MORPH_VALUES[morphStep]
+    local count = 0
+    for _, mesh in ipairs(FindAllOf("SkeletalMeshComponent") or {}) do
+        if mesh:IsValid() and mesh:GetOwner():GetAddress() == hero:GetAddress() then
+            for _, name in ipairs(names) do
+                mesh:SetMorphTarget(FName(name), value, false)
+            end
+            count = count + 1
+        end
+    end
+    log("morph value " .. value .. " on " .. count .. " meshes")
+end
+
+bind(Key.F10, "belly morph", function()
+    setMorphs({ "BS_BOD_Belly" })
+end)
+
+bind(Key.F11, "build morphs", function()
+    setMorphs(BUILD_MORPHS)
+end)
+
+-- dev.ps1 bench times the gap between the first two marks. Works without being in game, so it can start a load.
+RegisterKeyBind(Key.F12, { ModifierKey.CONTROL }, function()
+    log("mark")
+end)
+
 log("loaded")

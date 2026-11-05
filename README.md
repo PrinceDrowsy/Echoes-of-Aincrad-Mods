@@ -25,6 +25,11 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Ctrl+F7 | Show a test chat message with custom text |
 | Ctrl+F8 | Start the quest set in `START_QUEST` |
 | Ctrl+F9 | Complete the current quest |
+| Ctrl+F10 | Log body values and step the belly morph through test values, live meshes only |
+| Ctrl+F11 | The same for belly, butt, hips, thighs, arms, forearms and legs together |
+| Ctrl+F12 | Log a mark. `dev.ps1 bench` reports the time between the first two as the load time |
+
+`shared/` holds code every mod uses. `dev.ps1 deploy` copies it into the mod's `Scripts` folder, so each mod installs on its own.
 
 ## Docs
 
