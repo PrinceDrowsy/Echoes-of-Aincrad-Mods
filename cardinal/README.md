@@ -200,12 +200,16 @@ The CSVs hold the same cells and markers flat. `layers` in the cells CSV is join
 ```
 .\build.ps1           # debug build
 .\build.ps1 run help  # build and run with arguments
+.\build.ps1 test      # run the tests
 .\build.ps1 publish   # one self-contained Cardinal.exe in publish\, with README, license and notices
+.\build.ps1 release   # publish, then release\Cardinal-VERSION.zip, CardinalMappings-VERSION.zip and SHA256.txt
 ```
 
 Needs the .NET 10 SDK. `build.ps1` keeps the SDK and every NuGet and .NET cache under `CARDINAL_TOOLS` (default `D:\dev-tools`) and temp files under `CARDINAL_SCRATCH` (default `obj\scratch`); set those to change where they go.
 
 Building mods needs `retoc.exe` and `repak.exe` beside `Cardinal.exe`. The project copies them from `..\tools\retoc\retoc.exe` and `..\tools\repak\repak.exe` (not committed), or from the paths in the `RetocExe` and `RepakExe` MSBuild properties. retoc downloads `oo2core_9_win64.dll` next to itself the first time it runs; `publish` deletes any such copy so it never ships.
+
+`tests/Cardinal.Tests` covers projects, merging, `.locres` reading and writing and the CSV round trip without the game. The rest read your own copy of the game, from Cardinal's saved settings or a `settings.json` named by `CARDINAL_TEST_SETTINGS`, and are skipped when there isn't one: they load every table, write each language's text back byte for byte, read both floors, and build, install and merge real mods. Those mods go into a folder of hard links to the game's containers under the temp folder, never into the game's own `~mods`, so the temp folder has to be on the same drive as the game.
 
 `src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects, building, merging and the conflict scan (UAssetAPI edits the extracted files, retoc extracts and packs them, repak packs text) and `Text/` for the game's text (Cardinal reads and writes `.locres` files itself). `src/Cardinal` is the window and the command line, and both call the same core code.
 

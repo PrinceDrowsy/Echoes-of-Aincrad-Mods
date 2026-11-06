@@ -23,13 +23,27 @@ public sealed class Settings
 
     public static Settings Load()
     {
-        var settings = File.Exists(FilePath)
-            ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath)) ?? new Settings()
-            : new Settings();
+        var settings = Read() ?? new Settings();
         settings.PaksFolder ??= FindPaksFolder();
         settings.OodleFile ??= FindOodle();
         settings.MappingsFile = NewerMappings(settings.MappingsFile, settings.PaksFolder);
         return settings;
+    }
+
+    // A damaged file is set aside rather than lost, and Cardinal starts again from the setup screen.
+    static Settings? Read()
+    {
+        if (!File.Exists(FilePath))
+            return null;
+        try
+        {
+            return JsonSerializer.Deserialize<Settings>(File.ReadAllText(FilePath));
+        }
+        catch (JsonException)
+        {
+            File.Move(FilePath, FilePath + ".damaged", true);
+            return null;
+        }
     }
 
     // The Cardinal Mappings companion mod dumps a fresh .usmap next to UE4SS after each game update,

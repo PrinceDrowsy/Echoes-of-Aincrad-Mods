@@ -187,16 +187,17 @@ public sealed partial class ModProject
         FindAddedText(ns, key) is { } text && AddedText.Remove(text);
 
     /// <summary>
-    /// The name the built files get: letters, digits, dashes and underscores, then the priority and _P.
+    /// The name the built files get: BaseName(), then the priority and _P.
     /// Unreal ranks patch containers by that number, and a plain Name_P ties with the game's own patch
     /// (pakchunk0-WindowsClient_0_P), so which copy of an asset loads would be left to chance.
     /// </summary>
-    public string FileName()
+    public string FileName() => $"{BaseName()}_{Priority}_P";
+
+    /// <summary>The name's letters, digits, dashes and underscores: the part of FileName() that stays the same at any priority.</summary>
+    public string BaseName()
     {
         var name = PatchSuffix().Replace(new string(Name.Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray()), "");
-        if (name.Length == 0)
-            name = "CardinalMod";
-        return $"{name}_{Priority}_P";
+        return name.Length > 0 ? name : "CardinalMod";
     }
 
     [System.Text.RegularExpressions.GeneratedRegex(@"(_\d+)?_P$")]

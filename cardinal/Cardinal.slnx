@@ -3,4 +3,7 @@
     <Project Path="src/Cardinal.Core/Cardinal.Core.csproj" />
     <Project Path="src/Cardinal/Cardinal.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Cardinal.Tests/Cardinal.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Cardinal.Tables;
 using Cardinal.Text;
 using Newtonsoft.Json.Linq;
@@ -40,6 +41,10 @@ public static class ModBuilder
         if (problems.Count > 0)
             throw new EditException(string.Join(Environment.NewLine, problems));
 
+        // An earlier build here could leave a container that this build, with no value changes, wouldn't replace.
+        Directory.CreateDirectory(output);
+        foreach (var ext in Extensions)
+            File.Delete(Path.Combine(output, project.FileName() + ext));
         var stage = EditableAsset.WorkFolder();
         try
         {
@@ -224,14 +229,22 @@ public static class ModBuilder
 
     static string? Original(Locres file, TextEdit edit) => file.Get(edit.Namespace, edit.Key);
 
+    static readonly string[] Extensions = [".utoc", ".ucas", ".pak"];
+
     public static string ModsFolder(Settings settings) => Path.Combine(settings.PaksFolder!, "~mods");
 
-    /// <summary>The files a build of this project would replace in ~mods.</summary>
-    public static IReadOnlyList<string> Installed(Settings settings, ModProject project) =>
-        new[] { ".utoc", ".ucas", ".pak" }
-            .Select(ext => Path.Combine(ModsFolder(settings), project.FileName() + ext))
-            .Where(File.Exists)
+    /// <summary>The project's builds in ~mods, at any priority, since a build from before a priority change would still load.</summary>
+    public static IReadOnlyList<string> Installed(Settings settings, ModProject project)
+    {
+        if (!Directory.Exists(ModsFolder(settings)))
+            return [];
+        var build = new Regex($@"^{Regex.Escape(project.BaseName())}_\d+_P$", RegexOptions.IgnoreCase);
+        return Directory.EnumerateFiles(ModsFolder(settings))
+            .Where(file => Extensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)
+                           && build.IsMatch(Path.GetFileNameWithoutExtension(file)))
+            .Order(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
 
     /// <summary>
     /// Builds straight into ~mods. Refuses to replace an earlier build unless overwrite is set, and then removes
@@ -241,7 +254,7 @@ public static class ModBuilder
     {
         var earlier = Installed(settings, project);
         if (!overwrite && earlier.Count > 0)
-            throw new IOException($"{project.FileName()} is already in {ModsFolder(settings)}. Replace it to install this build.");
+            throw new IOException($"{Builds(earlier)} {(earlier.Count == 1 ? "is" : "are")} already in {ModsFolder(settings)}. Replace them to install this build.");
         var stage = EditableAsset.WorkFolder();
         try
         {
@@ -262,4 +275,9 @@ public static class ModBuilder
             Directory.Delete(stage, true);
         }
     }
+
+    /// <summary>Installed build files by name, such as "MyMod_1000_P (.pak, .ucas, .utoc)".</summary>
+    public static string Builds(IEnumerable<string> files) =>
+        string.Join(", ", files.GroupBy(Path.GetFileNameWithoutExtension, StringComparer.OrdinalIgnoreCase)
+            .Select(g => $"{g.Key} ({string.Join(", ", g.Select(Path.GetExtension))})"));
 }

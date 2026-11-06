@@ -1,4 +1,5 @@
-﻿using CUE4Parse.Compression;
+﻿using Cardinal.Text;
+using CUE4Parse.Compression;
 using CUE4Parse.Encryption.Aes;
 using CUE4Parse.FileProvider;
 using CUE4Parse.MappingsProvider.Usmap;
@@ -23,11 +24,13 @@ public sealed class Game : IDisposable
     public DefaultFileProvider Provider { get; }
     // The main string table's keys and their English, which shows wherever a language has no line of its own.
     readonly Dictionary<string, string> sourceText;
+    readonly Locres english;
 
-    Game(DefaultFileProvider provider, Dictionary<string, string> sourceText)
+    Game(DefaultFileProvider provider, Dictionary<string, string> sourceText, Locres english)
     {
         Provider = provider;
         this.sourceText = sourceText;
+        this.english = english;
     }
 
     /// <summary>
@@ -37,11 +40,11 @@ public sealed class Game : IDisposable
     public static Game Open(Settings settings, bool withMods = false)
     {
         var provider = Mount(settings, withMods);
-        provider.LoadLocalization(ELanguage.English);
-
         var source = provider.LoadPackageObject<CUE4Parse.UE4.Assets.Exports.Internationalization.UStringTable>(ObjectPath(TextTablePath))
             .StringTable.KeysToEntries.ToDictionary(e => e.Key, e => e.Value);
-        return new Game(provider, source);
+        // Only the copy the game loads. CUE4Parse's LoadLocalization merges every copy, and the game's own can win over a mod's.
+        var english = Locres.Read(provider.SaveAsset(GameText.FilePath(GameText.English)));
+        return new Game(provider, source, english);
     }
 
     /// <summary>Mounts the game's containers, and with withMods everything under Paks too, without reading any text.</summary>
@@ -77,7 +80,7 @@ public sealed class Game : IDisposable
 
     /// <summary>English text for one of the game's text keys, such as ItemName_Material_1.</summary>
     public string? Text(string? key) =>
-        key is not null && sourceText.TryGetValue(key, out var english) ? Provider.Internationalization.SafeGet(TextNamespace, key, english) : null;
+        key is not null && sourceText.TryGetValue(key, out var source) ? english.Get(TextNamespace, key) ?? source : null;
 
     public bool HasText(string key) => sourceText.ContainsKey(key);
 

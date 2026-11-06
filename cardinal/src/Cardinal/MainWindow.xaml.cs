@@ -745,15 +745,12 @@ public partial class MainWindow : Window
     {
         if (game is null || PrepareMerge() is not { } merge)
             return;
-        if (ModBuilder.Installed(settings, merge.Merged).Count > 0 && MessageBox.Show(this,
-                $"{merge.Merged.FileName()} is already installed. Replace it with this build?",
-                "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (!ReplaceOk(merge.Merged))
             return;
         var current = game;
         if (await Run("Building and installing the merged patch...", () => ModBuilder.Install(current, settings, merge.Merged, true)) is not { } files)
             return;
         Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
-        installed = null;
 
         var singles = merge.Projects.SelectMany(p => ModBuilder.Installed(settings, p)).ToList();
         if (singles.Count > 0 && MessageBox.Show(this,
@@ -765,6 +762,22 @@ public partial class MainWindow : Window
             singles.ForEach(File.Delete);
             Status.Text += $" Removed {singles.Count} files the merged patch replaces.";
         }
+        await InstalledChanged();
+    }
+
+    bool ReplaceOk(ModProject building) =>
+        ModBuilder.Installed(settings, building) is not { Count: > 0 } earlier
+        || MessageBox.Show(this, $"Already installed in {ModBuilder.ModsFolder(settings)}: {ModBuilder.Builds(earlier)}. Replace with this build?",
+            "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+    // Rescans only when the Installed mods tab or the map is already showing a scan; otherwise the next look scans afresh.
+    async Task InstalledChanged()
+    {
+        if (installed is null)
+            return;
+        installed = null;
+        if (InstalledList.ItemsSource is not null || ModCellsBox.IsChecked == true)
+            await ScanMods();
     }
 
     async void ScanInstalled(object sender, RoutedEventArgs e) => await ScanMods();
@@ -963,16 +976,13 @@ public partial class MainWindow : Window
 
     async void BuildAndInstall(object sender, RoutedEventArgs e)
     {
-        if (game is null)
-            return;
-        var existing = ModBuilder.Installed(settings, project);
-        if (existing.Count > 0 && MessageBox.Show(this,
-                $"{project.FileName()} is already installed in {ModBuilder.ModsFolder(settings)}. Replace it with this build?",
-                "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        if (game is null || !ReplaceOk(project))
             return;
         var (current, building) = (game, project);
-        if (await Run("Building and installing the mod...", () => ModBuilder.Install(current, settings, building, true)) is { } files)
-            Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
+        if (await Run("Building and installing the mod...", () => ModBuilder.Install(current, settings, building, true)) is not { } files)
+            return;
+        Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
+        await InstalledChanged();
     }
 
     async void FloorSelected(object sender, SelectionChangedEventArgs e)
@@ -1038,6 +1048,9 @@ public partial class MainWindow : Window
             if (list is null)
                 return;
             markerCache[key] = list;
+            // Another floor may have been chosen while this one's markers were read.
+            if (floor != map)
+                return;
         }
         Map.SetMarkers(layer, list);
         Status.Text = $"{layer}: {list.Count} markers";
