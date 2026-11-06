@@ -116,6 +116,8 @@ local COL = 10000
 local EXP = 5000
 -- Category is the EItemCategory number Cardinal shows for the item (33 is healing items).
 local GIVE_ITEM = { Category = 33, ItemId = 1, Num = 5 }
+-- A playable quest is always a QST_Free_ number: 1NNNN for main quests, 2NNNN for side quests.
+local GIVE_QUEST = 20001
 
 local function cheat(key, label, action)
     RegisterKeyBind(key, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
@@ -153,6 +155,11 @@ cheat(Key.FOUR, "toggle noclip", function()
         return
     end
     manager:ToggleNoClip()
+end)
+
+-- What an NPC handing out a side quest does: adds it to the received list.
+cheat(Key.FIVE, "receive quest " .. GIVE_QUEST, function()
+    FindFirstOf("RODInGamePlayerController"):ServerAddQuestList({ GIVE_QUEST }, {})
 end)
 
 -- dev.ps1 bench times the gap between the first two marks. Works without being in game, so it can start a load.

@@ -32,6 +32,7 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Ctrl+Shift+2 | Give the item set in `GIVE_ITEM` (category number and ID, as Cardinal shows them) |
 | Ctrl+Shift+3 | Add 5,000 experience |
 | Ctrl+Shift+4 | Toggle noclip, if the game still has its cheat manager |
+| Ctrl+Shift+5 | Receive the quest set in `GIVE_QUEST`, as if an NPC handed it out (a `QST_Free_` number) |
 
 The cheats write to the save and are for solo play only, since the game has anti-cheat for online play.
 
