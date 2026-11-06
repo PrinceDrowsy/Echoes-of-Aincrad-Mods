@@ -28,6 +28,12 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Ctrl+F10 | Log body values and step the belly morph through test values, live meshes only |
 | Ctrl+F11 | The same for belly, butt, hips, thighs, arms, forearms and legs together |
 | Ctrl+F12 | Log a mark. `dev.ps1 bench` reports the time between the first two as the load time |
+| Ctrl+Shift+1 | Add 10,000 Col |
+| Ctrl+Shift+2 | Give the item set in `GIVE_ITEM` (category number and ID, as Cardinal shows them) |
+| Ctrl+Shift+3 | Add 5,000 experience |
+| Ctrl+Shift+4 | Toggle noclip, if the game still has its cheat manager |
+
+The cheats write to the save and are for solo play only, since the game has anti-cheat for online play.
 
 `shared/` holds code every mod uses. `dev.ps1 deploy` copies it into the mod's `Scripts` folder, so each mod installs on its own.
 

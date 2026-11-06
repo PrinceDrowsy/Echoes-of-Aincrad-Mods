@@ -110,6 +110,51 @@ bind(Key.F11, "build morphs", function()
     setMorphs(BUILD_MORPHS)
 end)
 
+-- Cheats on Ctrl+Shift, through the game's real functions, since many of its debug leftovers do nothing in
+-- this build. They write to the save, and the game has anti-cheat for online play, so solo only.
+local COL = 10000
+local EXP = 5000
+-- Category is the EItemCategory number Cardinal shows for the item (33 is healing items).
+local GIVE_ITEM = { Category = 33, ItemId = 1, Num = 5 }
+
+local function cheat(key, label, action)
+    RegisterKeyBind(key, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
+        ExecuteInGameThread(function()
+            local state = FindFirstOf("RODPlayerState")
+            if not (state and state:IsValid()) then
+                log(label .. ": not in game")
+                return
+            end
+            log(label)
+            action(state)
+        end)
+    end)
+end
+
+cheat(Key.ONE, "add " .. COL .. " col", function(state)
+    state:AddCol(COL)
+end)
+
+cheat(Key.TWO, "give item " .. GIVE_ITEM.Category .. "/" .. GIVE_ITEM.ItemId .. " x" .. GIVE_ITEM.Num, function()
+    local items = FindFirstOf("RODAvatarItemManager")
+    -- 4 is EExtraModificationLotteryType::ForceGrant.
+    items:ServerAddChestItemsItemDataBase({ { Category = GIVE_ITEM.Category, ItemId = GIVE_ITEM.ItemId,
+        Num = GIVE_ITEM.Num, HealHp = 0, HealSp = 0 } }, true, 4)
+end)
+
+cheat(Key.THREE, "add " .. EXP .. " exp", function(state)
+    log("levelled up=" .. tostring(state:CalcHeroLevelUp(EXP)))
+end)
+
+cheat(Key.FOUR, "toggle noclip", function()
+    local manager = FindFirstOf("RODCheatManager")
+    if not (manager and manager:IsValid()) then
+        log("no cheat manager in this build")
+        return
+    end
+    manager:ToggleNoClip()
+end)
+
 -- dev.ps1 bench times the gap between the first two marks. Works without being in game, so it can start a load.
 RegisterKeyBind(Key.F12, { ModifierKey.CONTROL }, function()
     log("mark")
