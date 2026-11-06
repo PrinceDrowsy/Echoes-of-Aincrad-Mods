@@ -13,8 +13,8 @@ public sealed class AssetRegistry
 
     const int SupportedVersion = 17;
     const uint TextFirstMagic = 0x12345679u, EndMagic = 0x87654321u, NumberedBit = 0x80000000u;
-    // A value ID keeps its type in the low 3 bits; 2 is a numberless name.
-    const uint NumberlessNameValue = 2;
+    // A value ID keeps its type in the low 3 bits and its index into that type's list above them.
+    const uint NumberlessNameValue = 2, NameValue = 3;
 
     readonly record struct Name(uint Index, uint Number);
 
@@ -31,7 +31,8 @@ public sealed class AssetRegistry
     readonly int[] counts = new int[11];
     byte[] texts = [];
     readonly List<uint> numberlessNames = [];
-    byte[] namesToStrings = [];
+    readonly List<Name> storeNames = [];
+    byte[] exportPathsToStrings = [];
     readonly List<(uint Key, uint Value)> numberlessPairs = [];
     byte[] numberedPairs = [];
 
@@ -65,10 +66,16 @@ public sealed class AssetRegistry
         {
             if (names[(int)pair.Key] != "PrimaryAssetName")
                 return pair;
-            if ((pair.Value & 7) != NumberlessNameValue)
+            if ((pair.Value & 7) is not (NumberlessNameValue or NameValue))
                 throw new EditException($"{from}'s PrimaryAssetName isn't stored as a name.");
-            numberlessNames.Add(assetName.Index);
-            return (pair.Key, ((uint)(numberlessNames.Count - 1) << 3) | NumberlessNameValue);
+            // A name with a number, such as QST_Free_20061, can only be stored as a full name.
+            if (assetName.Number == 0)
+            {
+                numberlessNames.Add(assetName.Index);
+                return (pair.Key, ((uint)(numberlessNames.Count - 1) << 3) | NumberlessNameValue);
+            }
+            storeNames.Add(assetName);
+            return (pair.Key, ((uint)(storeNames.Count - 1) << 3) | NameValue);
         }).ToList();
         var first = numberlessPairs.Count;
         numberlessPairs.AddRange(pairs);
@@ -82,16 +89,30 @@ public sealed class AssetRegistry
         });
     }
 
+    // The engine splits a trailing _123 off into the name's number, stored plus one, so QST_Free_20061 is QST_Free
+    // with number 20062, while Town_011 stays whole because of its leading zero.
     Name Add(string text)
     {
-        if (!nameIndex.TryGetValue(text, out var index))
+        var (plain, number) = Split(text);
+        if (!nameIndex.TryGetValue(plain, out var index))
         {
-            nameIndex[text] = index = names.Count;
-            names.Add(text);
-            wide.Add(text.Any(c => c > 0x7F));
-            hashes.Add(NameHash(text));
+            nameIndex[plain] = index = names.Count;
+            names.Add(plain);
+            wide.Add(plain.Any(c => c > 0x7F));
+            hashes.Add(NameHash(plain));
         }
-        return new Name((uint)index, 0);
+        return new Name((uint)index, number);
+    }
+
+    internal static (string Plain, uint Number) Split(string text)
+    {
+        var digits = 0;
+        while (digits < text.Length && char.IsAsciiDigit(text[^(digits + 1)]))
+            digits++;
+        if (digits == 0 || digits == text.Length || digits > 10 || text[^(digits + 1)] != '_' || (digits > 1 && text[^digits] == '0')
+            || !long.TryParse(text.AsSpan(text.Length - digits), out var value) || value >= int.MaxValue)
+            return (text, 0);
+        return (text[..^(digits + 1)], (uint)value + 1);
     }
 
     // The engine's FNameHash: CityHash64 of the name with only ASCII lower-cased, as single bytes or UTF-16 like the name.
@@ -148,14 +169,14 @@ public sealed class AssetRegistry
         r.texts = data[(int)start..(int)reader.BaseStream.Position];
         for (var i = 0; i < r.counts[0]; i++)
             r.numberlessNames.Add(reader.ReadUInt32());
-        start = reader.BaseStream.Position;
         for (var i = 0; i < r.counts[1]; i++)
-            SkipName(reader);
+            r.storeNames.Add(ReadName(reader));
+        start = reader.BaseStream.Position;
         reader.BaseStream.Position += r.counts[2] * 16L; // numberless export paths: four name indices each
         for (var i = 0; i < r.counts[3] * 4; i++)
             SkipName(reader); // export paths: class package, class, object, package
         reader.BaseStream.Position += r.counts[5] * 4L + r.counts[6] * 4L + r.counts[7] + r.counts[8] * 2L;
-        r.namesToStrings = data[(int)start..(int)reader.BaseStream.Position];
+        r.exportPathsToStrings = data[(int)start..(int)reader.BaseStream.Position];
         for (var i = 0; i < r.counts[9]; i++)
             r.numberlessPairs.Add((reader.ReadUInt32(), reader.ReadUInt32()));
         start = reader.BaseStream.Position;
@@ -219,12 +240,15 @@ public sealed class AssetRegistry
 
         w.Write(storeMagic);
         counts[0] = numberlessNames.Count;
+        counts[1] = storeNames.Count;
         counts[9] = numberlessPairs.Count;
         foreach (var count in counts)
             w.Write(count);
         w.Write(texts);
         numberlessNames.ForEach(w.Write);
-        w.Write(namesToStrings);
+        foreach (var name in storeNames)
+            WriteName(w, name);
+        w.Write(exportPathsToStrings);
         foreach (var (key, value) in numberlessPairs)
         {
             w.Write(key);

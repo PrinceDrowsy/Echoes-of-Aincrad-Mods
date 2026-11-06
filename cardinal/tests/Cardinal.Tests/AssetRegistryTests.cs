@@ -46,6 +46,33 @@ public class AssetRegistryTests(GameFixture fixture)
     }
 
     [Fact]
+    public void ANumberedNameCopiesAsTheEngineWouldName()
+    {
+        const string quest = "/Game/ROD/DataAssets/Quests/Free/Free_Sub/QST_Free_20001", copy = "/Game/ROD/DataAssets/Quests/Free/Free_Sub/QST_Free_20061";
+        var registry = AssetRegistry.Read(GameFile());
+        registry.AddCopy(quest, copy);
+        var written = registry.Write();
+        Assert.True(AssetRegistry.Read(written).Contains(copy));
+
+        var state = new FAssetRegistryState(new FByteArchive("registry", written, fixture.Require().Provider.Versions));
+        var entry = Assert.Single(state.PreallocatedAssetDataBuffers, a => a.PackageName.Text == copy);
+        Assert.Equal("QST_Free_20061", entry.AssetName.Text);
+        Assert.Equal("QST_Free", entry.AssetName.PlainText);
+        Assert.Equal("QST_Free_20061", entry.TagsAndValues.Single(t => t.Key.Text == "PrimaryAssetName").Value);
+        Assert.Equal("Quest", entry.TagsAndValues.Single(t => t.Key.Text == "PrimaryAssetType").Value);
+    }
+
+    [Theory]
+    [InlineData("QST_Free_20061", "QST_Free", 20062u)]
+    [InlineData("Town_011", "Town_011", 0u)]
+    [InlineData("Name_0", "Name", 1u)]
+    [InlineData("Name_", "Name_", 0u)]
+    [InlineData("_5", "", 6u)]
+    [InlineData("Big_99999999999", "Big_99999999999", 0u)]
+    public void NamesSplitLikeTheEngine(string text, string plain, uint number) =>
+        Assert.Equal((plain, number), AssetRegistry.Split(text));
+
+    [Fact]
     public void RefusesMissingAndTakenNames()
     {
         var registry = AssetRegistry.Read(GameFile());
