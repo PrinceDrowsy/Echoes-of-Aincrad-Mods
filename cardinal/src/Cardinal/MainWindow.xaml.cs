@@ -25,6 +25,8 @@ public partial class MainWindow : Window
     ];
     static readonly Brush DeveloperBrush = new SolidColorBrush(Color.FromRgb(255, 140, 40));
     static readonly Brush ChangedBrush = new SolidColorBrush(Color.FromRgb(255, 236, 150));
+    static readonly Brush TieBrush = new SolidColorBrush(Color.FromRgb(220, 40, 40));
+    static readonly Brush OutrankedBrush = new SolidColorBrush(Color.FromRgb(60, 60, 66));
 
     Settings settings = Settings.Load();
     Game? game;
@@ -38,6 +40,9 @@ public partial class MainWindow : Window
     // Assets parsed for editing, by game file. Several item tables share one asset.
     readonly Dictionary<string, EditableAsset> assets = [];
     Usmap? mappings;
+
+    // The last scan of Paks\~mods, shared by the Installed mods tab and the map. Null until something asks for it.
+    ModConflicts? installed;
 
     ModProject project = new();
     string? projectPath;
@@ -118,13 +123,10 @@ public partial class MainWindow : Window
 
     async void OpenGame(object sender, RoutedEventArgs e)
     {
-        settings = new Settings
-        {
-            PaksFolder = PaksBox.Text.Trim(),
-            AesKey = KeyBox.Text.Trim(),
-            MappingsFile = MappingsBox.Text.Trim(),
-            OodleFile = OodleBox.Text.Trim(),
-        };
+        settings.PaksFolder = PaksBox.Text.Trim();
+        settings.AesKey = KeyBox.Text.Trim();
+        settings.MappingsFile = MappingsBox.Text.Trim();
+        settings.OodleFile = OodleBox.Text.Trim();
         settings.Save();
         SetupProblems.Text = string.Join(Environment.NewLine, settings.Problems());
         if (SetupProblems.Text.Length > 0)
@@ -143,12 +145,15 @@ public partial class MainWindow : Window
         markerCache.Clear();
         assets.Clear();
         mappings = null;
+        installed = null;
+        ModCellsBox.IsChecked = false;
         var view = new ListCollectionView(opened.Tables.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TableSource.Group)));
         TableList.ItemsSource = view;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
-        TablesTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = true;
+        TablesTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
+        ShowMergeList();
         Status.Text = $"Opened. {opened.Tables.Count} tables and {opened.Floors.Count} floors found.";
         Tabs.SelectedItem = TablesTab;
     }
@@ -353,6 +358,8 @@ public partial class MainWindow : Window
         ModVersionBox.Text = project.Version;
         ModAuthorBox.Text = project.Author;
         ModDescriptionBox.Text = project.Description;
+        ModPriorityBox.Text = project.Priority.ToString();
+        CheckResults.Visibility = Visibility.Collapsed;
         showingProject = false;
         ShowEdits();
     }
@@ -379,7 +386,241 @@ public partial class MainWindow : Window
         project.Version = ModVersionBox.Text.Trim();
         project.Author = ModAuthorBox.Text.Trim();
         project.Description = ModDescriptionBox.Text.Trim();
+        if (int.TryParse(ModPriorityBox.Text.Trim(), out var priority) && priority is >= 1 and <= ModProject.MaxPriority)
+        {
+            project.Priority = priority;
+            Status.Text = $"Builds as {project.FileName()}.";
+        }
+        else
+            Status.Text = $"Priority must be a whole number from 1 to {ModProject.MaxPriority}. It stays at {project.Priority} until then.";
         MarkDirty();
+    }
+
+    async void CheckProject(object sender, RoutedEventArgs e)
+    {
+        if (game is null)
+            return;
+        if (project.Edits.Count == 0)
+        {
+            Status.Text = "The project has no changes to check.";
+            return;
+        }
+        var (current, checking) = (game, project);
+        if (await Run("Checking every change against the game...", () => ModBuilder.Check(current, settings, checking)) is not { } problems)
+            return;
+        CheckResults.Visibility = Visibility.Visible;
+        CheckResults.Text = problems.Count == 0
+            ? $"All {checking.Edits.Count} changes still fit the game."
+            : string.Join(Environment.NewLine, problems.Select(p => (p.Blocks ? "Can't be made any more: " : "Original value changed: ") + p));
+        Status.Text = problems.Count == 0 ? "Every change still fits the game." : $"The check found {problems.Count} things to look at.";
+    }
+
+    void CopyDiagnostics(object sender, RoutedEventArgs e)
+    {
+        Clipboard.SetText(Diagnostics.Report(settings));
+        Status.Text = "Diagnostic info copied. It has no key and no paths on your PC, so it's safe to paste into a bug report.";
+    }
+
+    void ShowMergeList()
+    {
+        var entries = new List<MergeEntry>();
+        var projects = new List<ModProject>();
+        for (var i = 0; i < settings.MergeProjects.Count; i++)
+        {
+            var path = settings.MergeProjects[i];
+            try
+            {
+                var loaded = ModProject.Load(path);
+                projects.Add(loaded);
+                entries.Add(new MergeEntry(i + 1, loaded.Name, loaded.Version, loaded.Edits.Count, path));
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException)
+            {
+                entries.Add(new MergeEntry(i + 1, "(can't be read)", "", 0, path));
+            }
+        }
+        MergeList.ItemsSource = entries;
+        if (projects.Count < 2)
+        {
+            ClashList.ItemsSource = null;
+            MergeInfo.Text = "Add at least two mod projects to merge.";
+            return;
+        }
+        var (merged, clashes) = ModMerge.Merge(projects);
+        ClashList.ItemsSource = clashes.Select(c => new ClashRow(c.Table, c.Row, c.Field,
+            string.Join(", ", c.Values.Select(v => $"{v.Mod}: {v.Value}")), c.Winner)).ToList();
+        MergeInfo.Text = $"{projects.Count} projects, {merged.Edits.Count} changes, {clashes.Count} values decided by order. " +
+                         $"Builds as {merged.FileName()}." +
+                         (projects.Count < entries.Count ? " Projects that can't be read are left out." : "");
+    }
+
+    void AddMergeProjects(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Cardinal mod project|*.json", Multiselect = true };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        settings.MergeProjects.AddRange(dialog.FileNames.Where(f => !settings.MergeProjects.Contains(f, StringComparer.OrdinalIgnoreCase)));
+        settings.Save();
+        ShowMergeList();
+    }
+
+    void RemoveMergeProject(object sender, RoutedEventArgs e) => ChangeMergeList(i => settings.MergeProjects.RemoveAt(i), -1);
+
+    void MoveMergeUp(object sender, RoutedEventArgs e) => ChangeMergeList(i => Swap(i, i - 1), -1);
+
+    void MoveMergeDown(object sender, RoutedEventArgs e) => ChangeMergeList(i => Swap(i, i + 1), 1);
+
+    void Swap(int a, int b)
+    {
+        if (b < 0 || b >= settings.MergeProjects.Count)
+            return;
+        (settings.MergeProjects[a], settings.MergeProjects[b]) = (settings.MergeProjects[b], settings.MergeProjects[a]);
+    }
+
+    void ChangeMergeList(Action<int> change, int move)
+    {
+        var index = MergeList.SelectedIndex;
+        if (index < 0)
+        {
+            Status.Text = "Select a project in the list first.";
+            return;
+        }
+        change(index);
+        settings.Save();
+        ShowMergeList();
+        MergeList.SelectedIndex = Math.Clamp(index + move, 0, settings.MergeProjects.Count - 1);
+    }
+
+    // Every listed project, or a message about the first one that can't be read.
+    (ModProject Merged, List<ModProject> Projects)? PrepareMerge()
+    {
+        try
+        {
+            var projects = settings.MergeProjects.Select(ModProject.Load).ToList();
+            return (ModMerge.Merge(projects).Merged, projects);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException)
+        {
+            MessageBox.Show(this, ex.Message, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+    }
+
+    async void BuildMergedToFolder(object sender, RoutedEventArgs e)
+    {
+        if (game is null || PrepareMerge() is not { } merge || ChooseFolder("Build the merged patch into") is not { } folder)
+            return;
+        var current = game;
+        if (await Run("Building the merged patch...", () => ModBuilder.Build(current, settings, merge.Merged, folder)) is { } files)
+            Status.Text = $"Built {string.Join(", ", files.Select(Path.GetFileName))} in {folder}";
+    }
+
+    async void InstallMerged(object sender, RoutedEventArgs e)
+    {
+        if (game is null || PrepareMerge() is not { } merge)
+            return;
+        if (ModBuilder.Installed(settings, merge.Merged).Count > 0 && MessageBox.Show(this,
+                $"{merge.Merged.FileName()} is already installed. Replace it with this build?",
+                "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        var current = game;
+        if (await Run("Building and installing the merged patch...", () => ModBuilder.Install(current, settings, merge.Merged, true)) is not { } files)
+            return;
+        Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
+        installed = null;
+
+        var singles = merge.Projects.SelectMany(p => ModBuilder.Installed(settings, p)).ToList();
+        if (singles.Count > 0 && MessageBox.Show(this,
+                "The merged patch has every change from these mods, so their own builds in ~mods aren't needed any more:" +
+                Environment.NewLine + string.Join(Environment.NewLine, singles.Select(Path.GetFileName)) +
+                Environment.NewLine + Environment.NewLine + "Remove them?",
+                "Cardinal", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+        {
+            singles.ForEach(File.Delete);
+            Status.Text += $" Removed {singles.Count} files the merged patch replaces.";
+        }
+    }
+
+    async void ScanInstalled(object sender, RoutedEventArgs e) => await ScanMods();
+
+    async Task<ModConflicts?> ScanMods()
+    {
+        if (await Run("Scanning installed mods...", () => ModConflicts.Scan(settings)) is not { } scanned)
+            return null;
+        installed = scanned;
+        InstalledList.ItemsSource = scanned.Mods.Select(m =>
+        {
+            var involved = scanned.Conflicts.Where(c => c.Holders.Contains(m)).ToList();
+            return new InstalledRow(m.Name, m.Assets.Count, involved.Count, involved.Count(c => c.Holders[0].Order > m.Order));
+        }).ToList();
+        ConflictList.ItemsSource = scanned.Conflicts.Select(c => new ConflictRow(c.Asset, c.Outcome())).ToList();
+        InstalledInfo.Text = $"{scanned.Mods.Count} mods installed, {scanned.Conflicts.Count} game files with a conflict.";
+        Status.Text = InstalledInfo.Text;
+        ShowModCells();
+        return scanned;
+    }
+
+    async void ModCellsToggled(object sender, RoutedEventArgs e)
+    {
+        if (ModCellsBox.IsChecked != true)
+        {
+            Map.SetModCells(null);
+            ModLegend.Children.Clear();
+            return;
+        }
+        if (installed is null && await ScanMods() is null)
+            ModCellsBox.IsChecked = false;
+        else
+            ShowModCells();
+    }
+
+    // Colours each cell a mod replaces by the mod the game would load there; red where that's left to chance.
+    void ShowModCells()
+    {
+        if (floor is null || installed is null || ModCellsBox.IsChecked != true)
+            return;
+        var brushes = installed.Mods.Select((m, i) => (m, (Brush)new SolidColorBrush(Palette[i % Palette.Length])))
+            .ToDictionary(p => p.m, p => p.Item2);
+        var cells = new Dictionary<string, ModCell>(StringComparer.OrdinalIgnoreCase);
+        var counts = new Dictionary<Brush, int>();
+        string? mainMap = null;
+        foreach (var asset in installed.Mods.SelectMany(m => m.Assets))
+        {
+            var owners = installed.Owners(asset)!;
+            if (asset.Equals(floor.MapAsset, StringComparison.OrdinalIgnoreCase))
+                mainMap = owners.Outcome();
+            if (floor.CellOf(asset) is not { } cell || cells.ContainsKey(cell))
+                continue;
+            var brush = owners.Winner switch
+            {
+                null => TieBrush,
+                { Installed: true } winner => brushes[winner],
+                _ => OutrankedBrush,
+            };
+            cells[cell] = new ModCell(owners.Outcome(), brush);
+            counts[brush] = counts.GetValueOrDefault(brush) + 1;
+        }
+        Map.SetModCells(cells);
+
+        ModLegend.Children.Clear();
+        foreach (var (mod, brush) in brushes.Where(b => counts.ContainsKey(b.Value)))
+            AddLegend(brush, $"{mod.Name}  ({counts[brush]})");
+        if (counts.ContainsKey(TieBrush))
+            AddLegend(TieBrush, $"Same priority, left to chance  ({counts[TieBrush]})");
+        if (counts.ContainsKey(OutrankedBrush))
+            AddLegend(OutrankedBrush, $"Outranked by the game, never used  ({counts[OutrankedBrush]})");
+        if (cells.Count == 0)
+            ModLegend.Children.Add(new TextBlock { Text = "No installed mod replaces cells on this floor.", Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap });
+        if (mainMap is not null)
+            ModLegend.Children.Add(new TextBlock { Text = $"This floor's main map is replaced: {mainMap}", TextWrapping = TextWrapping.Wrap });
+    }
+
+    void AddLegend(Brush brush, string label)
+    {
+        var line = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 1, 0, 1) };
+        line.Children.Add(new Border { Width = 12, Height = 12, Margin = new Thickness(0, 0, 6, 0), Background = brush });
+        line.Children.Add(new TextBlock { Text = label });
+        ModLegend.Children.Add(line);
     }
 
     bool DiscardOk() =>
@@ -517,6 +758,7 @@ public partial class MainWindow : Window
         GridBox.ItemsSource = MapView.Grids(map).ToList();
         GridBox.SelectedIndex = 0;
         Status.Text = $"{map.Id}: {map.Cells.Count} cells. Scroll to zoom, drag to pan, hover for details.";
+        ShowModCells();
     }
 
     void GridSelected(object sender, SelectionChangedEventArgs e)

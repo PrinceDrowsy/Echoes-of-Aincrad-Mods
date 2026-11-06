@@ -5,7 +5,18 @@
         Title="Cardinal - The Cardinal System" Width="1280" Height="800" MinWidth="800" MinHeight="500">
     <DockPanel>
         <StatusBar DockPanel.Dock="Bottom">
-            <TextBlock x:Name="Status" Text="Set up the game files to begin." />
+            <StatusBar.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <DockPanel LastChildFill="True" />
+                </ItemsPanelTemplate>
+            </StatusBar.ItemsPanel>
+            <StatusBarItem DockPanel.Dock="Right">
+                <Button Content="Copy diagnostic info" Padding="8,0" Click="CopyDiagnostics"
+                        ToolTip="Copies Cardinal's version, the game's version, your setup and installed mods for a bug report. Never includes your key or where things are on your PC." />
+            </StatusBarItem>
+            <StatusBarItem>
+                <TextBlock x:Name="Status" Text="Set up the game files to begin." />
+            </StatusBarItem>
         </StatusBar>
         <TabControl x:Name="Tabs">
 
@@ -108,6 +119,9 @@
                             <TextBlock Text="Grid level" FontWeight="Bold" />
                             <ComboBox x:Name="LevelBox" Margin="0,2,0,8" SelectionChanged="LevelSelected" />
                             <Button Content="Export this floor..." Padding="8,2" Margin="0,0,0,8" Click="ExportMap" />
+                            <CheckBox x:Name="ModCellsBox" Content="Show cells installed mods replace" Margin="0,0,0,4"
+                                      Checked="ModCellsToggled" Unchecked="ModCellsToggled" />
+                            <StackPanel x:Name="ModLegend" Margin="16,0,0,8" />
                             <TextBlock Text="Layers" FontWeight="Bold" />
                             <TextBlock TextWrapping="Wrap" Foreground="Gray" FontSize="11" Margin="0,0,0,4"
                                        Text="Developer layers are the level designers' notes left in the game. Showing them here never changes the game." />
@@ -138,6 +152,7 @@
                         <Grid.RowDefinitions>
                             <RowDefinition />
                             <RowDefinition />
+                            <RowDefinition />
                         </Grid.RowDefinitions>
                         <TextBlock Text="Name" VerticalAlignment="Center" Margin="0,2,6,2" />
                         <TextBox x:Name="ModNameBox" Grid.Column="1" Margin="0,2,12,2" TextChanged="ModDetailsChanged" />
@@ -147,17 +162,27 @@
                         <TextBox x:Name="ModAuthorBox" Grid.Row="1" Grid.Column="1" Margin="0,2,12,2" TextChanged="ModDetailsChanged" />
                         <TextBlock Text="Description" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" Margin="0,2,6,2" />
                         <TextBox x:Name="ModDescriptionBox" Grid.Row="1" Grid.Column="3" Margin="0,2,0,2" TextChanged="ModDetailsChanged" />
+                        <TextBlock Text="Priority" Grid.Row="2" VerticalAlignment="Center" Margin="0,2,6,2" />
+                        <DockPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" Margin="0,2,0,2">
+                            <TextBox x:Name="ModPriorityBox" Width="60" TextChanged="ModDetailsChanged" />
+                            <TextBlock Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0" TextWrapping="Wrap"
+                                       Text="1 to 9998. When two mods replace the same game file, the higher priority wins. Merging them is better than relying on it." />
+                        </DockPanel>
                     </Grid>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button Content="New project" Padding="8,2" Margin="0,0,4,4" Click="NewProject" />
                         <Button Content="Open project..." Padding="8,2" Margin="0,0,4,4" Click="OpenProject" />
                         <Button Content="Save project" Padding="8,2" Margin="0,0,4,4" Click="SaveProject" />
                         <Button Content="Save project as..." Padding="8,2" Margin="0,0,16,4" Click="SaveProjectAs" />
-                        <Button Content="Revert selected" Padding="8,2" Margin="0,0,16,4" Click="RevertSelected" />
+                        <Button Content="Revert selected" Padding="8,2" Margin="0,0,4,4" Click="RevertSelected" />
+                        <Button Content="Check against the game" Padding="8,2" Margin="0,0,16,4" Click="CheckProject"
+                                ToolTip="After a game update, shows changes that can't be made any more and values the update changed." />
                         <Button Content="Build mod into a folder..." Padding="8,2" Margin="0,0,4,4" Click="BuildToFolder" />
                         <Button Content="Build and install into ~mods" Padding="8,2" Margin="0,0,4,4" Click="BuildAndInstall" />
                     </WrapPanel>
                     <TextBlock x:Name="ModInfo" DockPanel.Dock="Top" Foreground="Gray" Margin="0,0,0,4" />
+                    <TextBox x:Name="CheckResults" DockPanel.Dock="Bottom" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="140"
+                             VerticalScrollBarVisibility="Auto" Margin="0,8,0,0" Visibility="Collapsed" />
                     <ListView x:Name="EditList" SelectionMode="Extended">
                         <ListView.View>
                             <GridView>
@@ -169,6 +194,97 @@
                             </GridView>
                         </ListView.View>
                     </ListView>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="Merge" x:Name="MergeTab" IsEnabled="False">
+                <DockPanel Margin="12">
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
+                        Mods that change the same game file replace each other, so only one of them works. Merging builds one patch from
+                        all of their changes instead. Where two set the same value, the one lower in the list wins. The merged patch has the
+                        top priority, so it wins over the mods it was made from.
+                    </TextBlock>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button Content="Add projects..." Padding="8,2" Margin="0,0,4,4" Click="AddMergeProjects" />
+                        <Button Content="Remove" Padding="8,2" Margin="0,0,4,4" Click="RemoveMergeProject" />
+                        <Button Content="Move up" Padding="8,2" Margin="0,0,4,4" Click="MoveMergeUp" />
+                        <Button Content="Move down" Padding="8,2" Margin="0,0,16,4" Click="MoveMergeDown" />
+                        <Button Content="Build merged patch into a folder..." Padding="8,2" Margin="0,0,4,4" Click="BuildMergedToFolder" />
+                        <Button Content="Build and install merged patch" Padding="8,2" Margin="0,0,4,4" Click="InstallMerged" />
+                    </WrapPanel>
+                    <TextBlock x:Name="MergeInfo" DockPanel.Dock="Top" Foreground="Gray" Margin="0,0,0,4" TextWrapping="Wrap" />
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <ListView x:Name="MergeList" SelectionMode="Single">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Order" Width="50" DisplayMemberBinding="{Binding Order}" />
+                                    <GridViewColumn Header="Mod" Width="200" DisplayMemberBinding="{Binding Name}" />
+                                    <GridViewColumn Header="Version" Width="80" DisplayMemberBinding="{Binding Version}" />
+                                    <GridViewColumn Header="Changes" Width="70" DisplayMemberBinding="{Binding Changes}" />
+                                    <GridViewColumn Header="Project file" Width="520" DisplayMemberBinding="{Binding Path}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                        <TextBlock Grid.Row="1" Text="Values more than one mod sets" FontWeight="Bold" Margin="0,8,0,4" />
+                        <ListView x:Name="ClashList" Grid.Row="2">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Table" Width="220" DisplayMemberBinding="{Binding Table}" />
+                                    <GridViewColumn Header="Row" Width="120" DisplayMemberBinding="{Binding Row}" />
+                                    <GridViewColumn Header="Field" Width="180" DisplayMemberBinding="{Binding Field}" />
+                                    <GridViewColumn Header="Values" Width="360" DisplayMemberBinding="{Binding Values}" />
+                                    <GridViewColumn Header="Wins" Width="140" DisplayMemberBinding="{Binding Winner}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Grid>
+                </DockPanel>
+            </TabItem>
+
+            <TabItem Header="Installed mods" x:Name="InstalledTab" IsEnabled="False">
+                <DockPanel Margin="12">
+                    <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
+                        Every mod in the Paks folder, made with Cardinal or not, and the game files more than one of them replaces.
+                        When two replace the same file, the game loads only one copy: the one with the higher priority, the number before _P
+                        in its name. Equal priorities leave it to chance, and a name ending in just _P ties with the game's own update.
+                    </TextBlock>
+                    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                        <Button Content="Scan installed mods" Padding="8,2" Margin="0,0,4,4" Click="ScanInstalled" />
+                    </WrapPanel>
+                    <TextBlock x:Name="InstalledInfo" DockPanel.Dock="Top" Foreground="Gray" Margin="0,0,0,4" />
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="2*" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="3*" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Text="Mods" FontWeight="Bold" Margin="0,0,0,4" />
+                        <ListView x:Name="InstalledList" Grid.Row="1">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Mod" Width="320" DisplayMemberBinding="{Binding Name}" />
+                                    <GridViewColumn Header="Game files" Width="90" DisplayMemberBinding="{Binding Files}" />
+                                    <GridViewColumn Header="In conflict" Width="90" DisplayMemberBinding="{Binding Conflicts}" />
+                                    <GridViewColumn Header="Never used" Width="90" DisplayMemberBinding="{Binding Unused}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                        <TextBlock Grid.Row="2" Text="Conflicts" FontWeight="Bold" Margin="0,8,0,4" />
+                        <ListView x:Name="ConflictList" Grid.Row="3">
+                            <ListView.View>
+                                <GridView>
+                                    <GridViewColumn Header="Game file" Width="520" DisplayMemberBinding="{Binding Asset}" />
+                                    <GridViewColumn Header="What happens" Width="620" DisplayMemberBinding="{Binding Outcome}" />
+                                </GridView>
+                            </ListView.View>
+                        </ListView>
+                    </Grid>
                 </DockPanel>
             </TabItem>
         </TabControl>

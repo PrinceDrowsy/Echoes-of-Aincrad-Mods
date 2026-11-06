@@ -11,6 +11,9 @@ public sealed class Settings
     public string? MappingsFile { get; set; }
     public string? OodleFile { get; set; }
 
+    /// <summary>The mod projects to merge, in order: later ones win where two change the same value.</summary>
+    public List<string> MergeProjects { get; set; } = [];
+
     public static string Folder { get; } =
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Cardinal");
 
@@ -60,7 +63,7 @@ public sealed class Settings
             yield return "The game's Paks folder isn't set or doesn't exist.";
         else if (!Directory.EnumerateFiles(PaksFolder, "*.utoc").Any())
             yield return "The Paks folder has no .utoc files. It should be EchoesofAincrad\\Content\\Paks.";
-        if (!IsValidKey(AesKey))
+        if (!HasValidKey)
             yield return "The AES key is missing or isn't 64 hex digits (an optional 0x in front is fine).";
         if (string.IsNullOrWhiteSpace(MappingsFile) || !File.Exists(MappingsFile))
             yield return "The mappings (.usmap) file isn't set or doesn't exist.";
@@ -75,14 +78,18 @@ public sealed class Settings
         return key.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ? key : "0x" + key;
     }
 
-    static bool IsValidKey(string? key)
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasValidKey
     {
-        var hex = key?.Trim();
-        if (hex is null)
-            return false;
-        if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
-            hex = hex[2..];
-        return hex.Length == 64 && hex.All(Uri.IsHexDigit);
+        get
+        {
+            var hex = AesKey?.Trim();
+            if (hex is null)
+                return false;
+            if (hex.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                hex = hex[2..];
+            return hex.Length == 64 && hex.All(Uri.IsHexDigit);
+        }
     }
 
     // The game can be in any Steam library, and libraryfolders.vdf says which one holds it.

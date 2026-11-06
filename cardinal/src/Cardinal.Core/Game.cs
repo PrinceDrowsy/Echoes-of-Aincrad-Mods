@@ -34,6 +34,17 @@ public sealed class Game : IDisposable
     /// </summary>
     public static Game Open(Settings settings, bool withMods = false)
     {
+        var provider = Mount(settings, withMods);
+        provider.LoadLocalization(ELanguage.English);
+
+        var keys = provider.LoadPackageObject<CUE4Parse.UE4.Assets.Exports.Internationalization.UStringTable>(ObjectPath(TextTablePath))
+            .StringTable.KeysToEntries.Keys.ToHashSet();
+        return new Game(provider, keys);
+    }
+
+    /// <summary>Mounts the game's containers, and with withMods everything under Paks too, without reading any text.</summary>
+    public static DefaultFileProvider Mount(Settings settings, bool withMods)
+    {
         var problems = settings.Problems().ToList();
         if (problems.Count > 0)
             throw new SetupException(string.Join(Environment.NewLine, problems));
@@ -52,11 +63,7 @@ public sealed class Game : IDisposable
             provider.Dispose();
             throw new SetupException("The game files didn't open. Check that the AES key matches this version of the game.");
         }
-        provider.LoadLocalization(ELanguage.English);
-
-        var keys = provider.LoadPackageObject<CUE4Parse.UE4.Assets.Exports.Internationalization.UStringTable>(ObjectPath(TextTablePath))
-            .StringTable.KeysToEntries.Keys.ToHashSet();
-        return new Game(provider, keys);
+        return provider;
     }
 
     // CUE4Parse wants Folder/Name.Name, not a file name with its extension.

@@ -32,6 +32,10 @@ public sealed partial class ModProject
 {
     public const int CurrentFormat = 1;
 
+    // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
+    // The merged patch takes the top number, so it wins over every mod it was merged from.
+    public const int DefaultPriority = 1000, MaxPriority = 9998, MergedPriority = 9999;
+
     static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -44,6 +48,7 @@ public sealed partial class ModProject
     public string Version { get; set; } = "1.0.0";
     public string Author { get; set; } = "";
     public string Description { get; set; } = "";
+    public int Priority { get; set; } = DefaultPriority;
     public List<ModEdit> Edits { get; set; } = [];
 
     public static ModProject Load(string path)
@@ -61,6 +66,8 @@ public sealed partial class ModProject
             throw new ArgumentException($"{Path.GetFileName(path)} is empty.");
         if (project.FormatVersion > CurrentFormat)
             throw new ArgumentException($"{Path.GetFileName(path)} was made by a newer Cardinal (format {project.FormatVersion}).");
+        if (project.Priority is < 1 or > MaxPriority)
+            throw new ArgumentException($"{Path.GetFileName(path)} has priority {project.Priority}; it must be from 1 to {MaxPriority}, since {MergedPriority} is kept for the merged patch.");
         return project;
     }
 
@@ -83,22 +90,18 @@ public sealed partial class ModProject
         Find(table, row, field) is { } edit && Edits.Remove(edit);
 
     /// <summary>
-    /// The name the built files get: letters, digits, dashes and underscores, ending in a patch number and _P.
+    /// The name the built files get: letters, digits, dashes and underscores, then the priority and _P.
     /// Unreal ranks patch containers by that number, and a plain Name_P ties with the game's own patch
     /// (pakchunk0-WindowsClient_0_P), so which copy of an asset loads would be left to chance.
     /// </summary>
     public string FileName()
     {
-        var name = new string(Name.Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray());
+        var name = PatchSuffix().Replace(new string(Name.Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_').ToArray()), "");
         if (name.Length == 0)
             name = "CardinalMod";
-        if (PatchSuffix().IsMatch(name))
-            return name;
-        if (name.EndsWith("_P"))
-            name = name[..^2];
-        return name + "_9999_P";
+        return $"{name}_{Priority}_P";
     }
 
-    [System.Text.RegularExpressions.GeneratedRegex(@"_\d+_P$")]
+    [System.Text.RegularExpressions.GeneratedRegex(@"(_\d+)?_P$")]
     private static partial System.Text.RegularExpressions.Regex PatchSuffix();
 }

@@ -9,7 +9,7 @@
     <UseWPF>true</UseWPF>
     <StartupObject>Cardinal.Program</StartupObject>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Product>Cardinal</Product>
     <AssemblyTitle>Cardinal - The Cardinal System</AssemblyTitle>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

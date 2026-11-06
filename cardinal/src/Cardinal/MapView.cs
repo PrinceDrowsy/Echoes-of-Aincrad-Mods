@@ -6,6 +6,9 @@ using Cardinal.Maps;
 
 namespace Cardinal;
 
+/// <summary>A map cell an installed mod replaces: what the game ends up loading there, and the colour it's drawn in.</summary>
+public sealed record ModCell(string Outcome, Brush Brush);
+
 /// <summary>Draws one grid level of a floor from above, with any loaded marker layers. Wheel zooms, dragging pans.</summary>
 public sealed class MapView : FrameworkElement
 {
@@ -21,6 +24,7 @@ public sealed class MapView : FrameworkElement
     readonly HashSet<string> visible = [];
     readonly Dictionary<string, IReadOnlyList<MapMarker>> markers = [];
     readonly Dictionary<string, Brush> colors = [];
+    IReadOnlyDictionary<string, ModCell>? modCells;
     double scale = 0.005;
     Vector offset;
     Point? dragFrom;
@@ -73,6 +77,16 @@ public sealed class MapView : FrameworkElement
         InvalidateVisual();
     }
 
+    /// <summary>Cells installed mods replace, by package name, drawn over the map whatever layers are shown. Null hides them.</summary>
+    public void SetModCells(IReadOnlyDictionary<string, ModCell>? cells)
+    {
+        modCells = cells;
+        InvalidateVisual();
+    }
+
+    IEnumerable<MapCell> ModdedCells() =>
+        modCells is null ? [] : floor?.Cells.Where(c => c.Grid == grid && c.Level == level && modCells.ContainsKey(c.Package)) ?? [];
+
     IEnumerable<MapCell> VisibleCells() =>
         floor?.Cells.Where(c => c.Grid == grid && c.Level == level
                                 && (c.Layers.Count == 0 ? visible.Contains(NoLayer) : c.Layers.All(visible.Contains))) ?? [];
@@ -119,6 +133,14 @@ public sealed class MapView : FrameworkElement
             var corner = ToScreen(cell.Center.X - cell.Size / 2, cell.Center.Y - cell.Size / 2);
             var size = cell.Size * scale;
             dc.DrawRectangle(layer is null ? gray : colors[layer], null, new Rect(corner.X + 0.5, corner.Y + 0.5, Math.Max(size - 1, 1), Math.Max(size - 1, 1)));
+        }
+
+        var outline = new Pen(Brushes.White, 1.5);
+        foreach (var cell in ModdedCells())
+        {
+            var corner = ToScreen(cell.Center.X - cell.Size / 2, cell.Center.Y - cell.Size / 2);
+            var size = cell.Size * scale;
+            dc.DrawRectangle(modCells![cell.Package].Brush, outline, new Rect(corner.X + 1, corner.Y + 1, Math.Max(size - 2, 1), Math.Max(size - 2, 1)));
         }
 
         var dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip;
@@ -185,10 +207,12 @@ public sealed class MapView : FrameworkElement
         if (marker is not null)
             return $"{marker.Layer}: {marker.Kind}  \"{marker.Label}\"  at {marker.Location.X:0}, {marker.Location.Y:0}, {marker.Location.Z:0}  in cell {marker.Cell}";
 
-        var cell = VisibleCells().FirstOrDefault(c => Math.Abs(world.X - c.Center.X) <= c.Size / 2 && Math.Abs(world.Y - c.Center.Y) <= c.Size / 2);
+        var cell = ModdedCells().Concat(VisibleCells())
+            .FirstOrDefault(c => Math.Abs(world.X - c.Center.X) <= c.Size / 2 && Math.Abs(world.Y - c.Center.Y) <= c.Size / 2);
         var position = $"X {world.X:0}, Y {world.Y:0}";
-        return cell is null
-            ? position
-            : $"{position}  |  cell {cell.Package}, level {cell.Level} square ({cell.X}, {cell.Y}), {cell.Size / 100:0} m, layers: {(cell.Layers.Count == 0 ? "none" : string.Join(", ", cell.Layers))}";
+        if (cell is null)
+            return position;
+        var text = $"{position}  |  cell {cell.Package}, level {cell.Level} square ({cell.X}, {cell.Y}), {cell.Size / 100:0} m, layers: {(cell.Layers.Count == 0 ? "none" : string.Join(", ", cell.Layers))}";
+        return modCells?.GetValueOrDefault(cell.Package) is { } mod ? $"{text}  |  {mod.Outcome}" : text;
     }
 }

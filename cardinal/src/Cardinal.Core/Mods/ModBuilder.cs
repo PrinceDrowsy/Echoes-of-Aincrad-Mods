@@ -1,7 +1,14 @@
 using Cardinal.Tables;
+using Newtonsoft.Json.Linq;
 using UAssetAPI.Unversioned;
 
 namespace Cardinal.Mods;
+
+/// <summary>Something wrong with one edit. A blocking problem stops the build; the rest are warnings.</summary>
+public sealed record EditProblem(ModEdit Edit, string Problem, bool Blocks)
+{
+    public override string ToString() => $"{Edit.Table} / {Edit.Row} / {Edit.Field}: {Problem}";
+}
 
 /// <summary>Turns a mod project into the three files the game loads from Paks\~mods.</summary>
 public static class ModBuilder
@@ -15,31 +22,7 @@ public static class ModBuilder
         if (project.Edits.Count == 0)
             throw new EditException("The project has no changes to build.");
 
-        var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
-        var mappings = new Usmap(settings.MappingsFile!);
-        var assets = new Dictionary<string, EditableAsset>();
-        var problems = new List<string>();
-        var plan = new List<(EditableAsset Asset, EditTarget Target, ModEdit Edit)>();
-
-        foreach (var edit in project.Edits)
-        {
-            if (!sources.TryGetValue(edit.Table, out var source))
-            {
-                problems.Add($"{edit.Table}: no such table.");
-                continue;
-            }
-            if (source.Target is not { } target)
-            {
-                problems.Add($"{edit.Table}: this table is read-only.");
-                continue;
-            }
-            if (!assets.TryGetValue(target.File, out var asset))
-                assets[target.File] = asset = EditableAsset.Load(settings, mappings, target.File);
-            if (asset.Check(target, edit) is { } problem)
-                problems.Add($"{edit.Table} / {edit.Row} / {edit.Field}: {problem}");
-            else
-                plan.Add((asset, target, edit));
-        }
+        var (plan, problems) = Plan(game, settings, project);
         if (problems.Count > 0)
             throw new EditException(string.Join(Environment.NewLine, problems));
 
@@ -56,6 +39,61 @@ public static class ModBuilder
         {
             Directory.Delete(stage, true);
         }
+    }
+
+    /// <summary>
+    /// Checks every edit against the current unmodded game: edits that can no longer be made block a build, and
+    /// edits whose original value has changed since they were made (usually after a game update) are warnings.
+    /// </summary>
+    public static IReadOnlyList<EditProblem> Check(Game game, Settings settings, ModProject project)
+    {
+        var (_, problems) = Plan(game, settings, project);
+        var broken = problems.Select(p => p.Edit).ToHashSet();
+        var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
+        var tables = new Dictionary<string, Table>();
+        foreach (var edit in project.Edits.Where(e => e.Original is not null && !broken.Contains(e)))
+        {
+            if (!tables.TryGetValue(edit.Table, out var table))
+                tables[edit.Table] = table = sources[edit.Table].Load(game);
+            var row = table.Rows.ToList().FindIndex(r => r.Key == edit.Row);
+            var current = row >= 0 && table.Field(row, edit.Field) is JValue value ? Table.Cell(value) : null;
+            if (current is not null && !ModEdit.Same(current, edit.Original))
+                problems.Add(new EditProblem(edit,
+                    $"the unmodded game now has {current} here, not {edit.Original} as when this change was made. Your value {edit.Value} still applies.",
+                    false));
+        }
+        return problems;
+    }
+
+    static (List<(EditableAsset Asset, EditTarget Target, ModEdit Edit)> Plan, List<EditProblem> Problems) Plan(
+        Game game, Settings settings, ModProject project)
+    {
+        var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
+        var mappings = new Usmap(settings.MappingsFile!);
+        var assets = new Dictionary<string, EditableAsset>();
+        var problems = new List<EditProblem>();
+        var plan = new List<(EditableAsset, EditTarget, ModEdit)>();
+
+        foreach (var edit in project.Edits)
+        {
+            if (!sources.TryGetValue(edit.Table, out var source))
+            {
+                problems.Add(new EditProblem(edit, "no such table.", true));
+                continue;
+            }
+            if (source.Target is not { } target)
+            {
+                problems.Add(new EditProblem(edit, "this table is read-only.", true));
+                continue;
+            }
+            if (!assets.TryGetValue(target.File, out var asset))
+                assets[target.File] = asset = EditableAsset.Load(settings, mappings, target.File);
+            if (asset.Check(target, edit) is { } problem)
+                problems.Add(new EditProblem(edit, problem, true));
+            else
+                plan.Add((asset, target, edit));
+        }
+        return (plan, problems);
     }
 
     public static string ModsFolder(Settings settings) => Path.Combine(settings.PaksFolder!, "~mods");

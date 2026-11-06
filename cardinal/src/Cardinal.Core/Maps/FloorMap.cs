@@ -46,6 +46,13 @@ public sealed partial class FloorMap
         cellFolder = mapPath[..^".umap".Length] + "/_Generated_/";
     }
 
+    /// <summary>The floor's main map as an asset path without extension, the form ModConflicts uses.</summary>
+    public string MapAsset => MapPath[..^".umap".Length];
+
+    /// <summary>The cell an asset path (without extension) belongs to, or null if it isn't one of this floor's cells.</summary>
+    public string? CellOf(string asset) =>
+        asset.StartsWith(cellFolder, StringComparison.OrdinalIgnoreCase) ? asset[cellFolder.Length..] : null;
+
     /// <summary>Floor IDs such as WL01, for every floor that has a World Partition map.</summary>
     public static IReadOnlyList<string> Floors(Game game) =>
         game.FindFiles("ROD/Maps/Main/", ".umap")

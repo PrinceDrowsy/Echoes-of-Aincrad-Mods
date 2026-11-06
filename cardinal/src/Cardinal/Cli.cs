@@ -9,14 +9,15 @@ namespace Cardinal;
 /// <summary>The command-line mode. Same readers, exporters and builder as the window.</summary>
 static class Cli
 {
-    const int Ok = 0, Usage = 1, Setup = 2, ReadFailed = 3, WriteFailed = 4;
+    const int Ok = 0, Usage = 1, Setup = 2, ReadFailed = 3, WriteFailed = 4, Found = 5;
 
-    const string Help = """
-        Cardinal 0.2 - reads Echoes of Aincrad's game files and builds data mods. Run with no arguments for the window.
+    static readonly string Help = $"""
+        Cardinal {Diagnostics.Version} - reads Echoes of Aincrad's game files and builds data mods. Run with no arguments for the window.
 
         Commands:
           setup [--paks DIR] [--key HEX] [--usmap FILE] [--oodle FILE] [--download-oodle]
                 Saves settings for later runs and reports anything still missing.
+          diagnostics              Setup, game version and installed mods for a bug report. Never shows the key.
           list tables              Every table: id, row source, and "editable" or "read-only".
           list floors              Floors with a World Partition map.
           list layers FLOOR        A floor's data layers: name, parent, developer, cell count.
@@ -27,17 +28,26 @@ static class Cli
           set PROJECT TABLE ROW FIELD VALUE
                 Checks one change against the game and saves it in the mod project (made if missing).
                 Setting a field back to its original value removes the change.
+          check PROJECT
+                Re-checks every change against the current game, for example after a game update.
           build PROJECT --out DIR
           build PROJECT --install [--force]
-                Builds the project into NAME_P.utoc, .ucas and .pak, in DIR or straight into Paks\~mods.
+                Builds the project into NAME_PRIORITY_P.utoc, .ucas and .pak, in DIR or straight into Paks\~mods.
                 --force replaces an earlier build there.
+          merge PROJECT PROJECT... --out DIR
+          merge PROJECT PROJECT... --install [--force] [--remove-single-builds]
+                Combines the projects into one {ModMerge.Name}_{ModProject.MergedPriority}_P patch. Where two change the
+                same value, the one listed later wins. --remove-single-builds deletes their own builds from ~mods.
+          conflicts
+                Lists files that more than one installed mod replaces, and which copy the game loads.
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        Builds and set always start from the unmodded game.
+        set, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
-        3 a game file couldn't be read, 4 writing failed or a build is already installed.
+        3 a game file couldn't be read, 4 writing failed or a build is already installed,
+        5 check or conflicts found something to look at.
         """;
 
     public static int Run(string[] args)
@@ -52,13 +62,17 @@ static class Cli
                 0 => Print(Help),
                 1 when Word(0) == "help" => Print(Help),
                 1 when Word(0) == "setup" => RunSetup(options),
+                1 when Word(0) == "diagnostics" => Print(Diagnostics.Report(options.Apply(Settings.Load()))),
+                1 when Word(0) == "conflicts" => ListConflicts(options),
                 2 when Word(0) == "list" && Word(1) == "tables" => WithGame(options, (game, _) => ListTables(game)),
                 2 when Word(0) == "list" && Word(1) == "floors" => WithGame(options, (game, _) => Lines(FloorMap.Floors(game))),
                 3 when Word(0) == "list" && Word(1) == "layers" => WithGame(options, (game, _) => ListLayers(game, w[2])),
                 2 when Word(0) == "export" && Word(1) == "tables" => WithGame(options, (game, _) => ExportTables(game, options)),
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
-                6 when Word(0) == "set" => WithGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
-                2 when Word(0) == "build" => WithGame(options, (game, settings) => Build(game, settings, w[1], options)),
+                6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
+                2 when Word(0) == "check" => WithUnmoddedGame(options, (game, settings) => Check(game, settings, w[1])),
+                2 when Word(0) == "build" => WithUnmoddedGame(options, (game, settings) => Build(game, settings, w[1], options)),
+                >= 3 when Word(0) == "merge" => WithUnmoddedGame(options, (game, settings) => Merge(game, settings, w.Skip(1).ToList(), options)),
                 _ => Fail(Usage, "Unknown command. Run Cardinal help for the list."),
             };
         }
@@ -93,27 +107,35 @@ static class Cli
             return Fail(Setup, e.Message);
         }
         using (game)
+            return Guarded(() => command(game, settings));
+    }
+
+    static int WithUnmoddedGame(Options options, Func<Game, Settings, int> command) =>
+        options.Has("with-mods")
+            ? Fail(Usage, "This command always works from the unmodded game, so it can't take --with-mods.")
+            : WithGame(options, command);
+
+    static int Guarded(Func<int> command)
+    {
+        try
         {
-            try
-            {
-                return command(game, settings);
-            }
-            catch (Exception e) when (e is ArgumentException or EditException)
-            {
-                return Fail(Usage, e.Message);
-            }
-            catch (SetupException e)
-            {
-                return Fail(Setup, e.Message);
-            }
-            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-            {
-                return Fail(WriteFailed, e.Message);
-            }
-            catch (Exception e)
-            {
-                return Fail(ReadFailed, e.Message);
-            }
+            return command();
+        }
+        catch (Exception e) when (e is ArgumentException or EditException)
+        {
+            return Fail(Usage, e.Message);
+        }
+        catch (SetupException e)
+        {
+            return Fail(Setup, e.Message);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return Fail(WriteFailed, e.Message);
+        }
+        catch (Exception e)
+        {
+            return Fail(ReadFailed, e.Message);
         }
     }
 
@@ -185,17 +207,59 @@ static class Cli
 
     static int Build(Game game, Settings settings, string projectPath, Options options)
     {
-        if (!File.Exists(projectPath))
-            throw new ArgumentException($"No mod project at {projectPath}.");
-        var project = ModProject.Load(projectPath);
-        IReadOnlyList<string> files;
-        if (options.Has("install"))
-            files = ModBuilder.Install(game, settings, project, options.Has("force"));
-        else
-            files = ModBuilder.Build(game, settings, project, options.Required("out"));
+        var project = LoadProject(projectPath);
+        var files = options.Has("install")
+            ? ModBuilder.Install(game, settings, project, options.Has("force"))
+            : ModBuilder.Build(game, settings, project, options.Required("out"));
         Console.WriteLine($"Built {project.Edits.Count} changes into:");
         return Lines(files);
     }
+
+    static ModProject LoadProject(string path) =>
+        File.Exists(path) ? ModProject.Load(path) : throw new ArgumentException($"No mod project at {path}.");
+
+    static int Check(Game game, Settings settings, string projectPath)
+    {
+        var project = LoadProject(projectPath);
+        var problems = ModBuilder.Check(game, settings, project);
+        foreach (var problem in problems)
+            Console.WriteLine($"{(problem.Blocks ? "can't build" : "changed   ")}  {problem}");
+        Console.WriteLine(problems.Count == 0
+            ? $"All {project.Edits.Count} changes still fit the game."
+            : $"Of {project.Edits.Count} changes, can't be made any more: {problems.Count(p => p.Blocks)}. Original value changed: {problems.Count(p => !p.Blocks)}.");
+        return problems.Count == 0 ? Ok : Found;
+    }
+
+    static int Merge(Game game, Settings settings, IReadOnlyList<string> projectPaths, Options options)
+    {
+        var projects = projectPaths.Select(LoadProject).ToList();
+        var (merged, clashes) = ModMerge.Merge(projects);
+        foreach (var clash in clashes)
+            Console.WriteLine(clash);
+        var files = options.Has("install")
+            ? ModBuilder.Install(game, settings, merged, options.Has("force"))
+            : ModBuilder.Build(game, settings, merged, options.Required("out"));
+        Console.WriteLine($"Merged {projects.Count} projects, {merged.Edits.Count} changes, {clashes.Count} decided by order, into:");
+        Lines(files);
+        if (options.Has("install") && options.Has("remove-single-builds"))
+            foreach (var file in projects.SelectMany(p => ModBuilder.Installed(settings, p)))
+            {
+                File.Delete(file);
+                Console.WriteLine($"Removed {file}");
+            }
+        return Ok;
+    }
+
+    static int ListConflicts(Options options) => Guarded(() =>
+    {
+        var conflicts = ModConflicts.Scan(options.Apply(Settings.Load()));
+        foreach (var mod in conflicts.Mods)
+            Console.WriteLine($"mod\t{mod.Name}\t{mod.Assets.Count} {(mod.Assets.Count == 1 ? "file" : "files")}");
+        foreach (var conflict in conflicts.Conflicts)
+            Console.WriteLine($"conflict\t{conflict.Asset}\t{conflict.Outcome()}");
+        Console.WriteLine($"{conflicts.Mods.Count} mods installed, {conflicts.Conflicts.Count} files with a conflict.");
+        return conflicts.Conflicts.Count == 0 ? Ok : Found;
+    });
 
     static int Lines(IEnumerable<string> lines)
     {
@@ -218,7 +282,7 @@ static class Cli
 
     sealed class Options
     {
-        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force"];
+        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds"];
         static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.
