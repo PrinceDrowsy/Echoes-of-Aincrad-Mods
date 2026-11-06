@@ -14,4 +14,8 @@
     <PackageReference Include="Microsoft.Bcl.Memory" Version="10.0.14" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cardinal.Tests" />
+  </ItemGroup>
+
 </Project>

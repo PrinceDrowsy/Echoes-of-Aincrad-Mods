@@ -211,7 +211,7 @@ Building mods needs `retoc.exe` and `repak.exe` beside `Cardinal.exe`. The proje
 
 `tests/Cardinal.Tests` covers projects, merging, `.locres` reading and writing and the CSV round trip without the game. The rest read your own copy of the game, from Cardinal's saved settings or a `settings.json` named by `CARDINAL_TEST_SETTINGS`, and are skipped when there isn't one: they load every table, write each language's text back byte for byte, read both floors, and build, install and merge real mods. Those mods go into a folder of hard links to the game's containers under the temp folder, never into the game's own `~mods`, so the temp folder has to be on the same drive as the game.
 
-`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects, building, merging and the conflict scan (UAssetAPI edits the extracted files, retoc extracts and packs them, repak packs text) and `Text/` for the game's text (Cardinal reads and writes `.locres` files itself). `src/Cardinal` is the window and the command line, and both call the same core code.
+`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects, building, merging, the conflict scan and the game's asset registry (read and extended byte for byte, for adding new primary assets such as towns) (UAssetAPI edits the extracted files, retoc extracts and packs them, repak packs text) and `Text/` for the game's text (Cardinal reads and writes `.locres` files itself). `src/Cardinal` is the window and the command line, and both call the same core code.
 
 ## Credits
 
