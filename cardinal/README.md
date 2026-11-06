@@ -1,9 +1,10 @@
 # Cardinal - The Cardinal System
 
-A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.3 reads the game, builds data mods from your changes, and merges mods that change the same files.
+A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.4 reads the game, builds data and text mods from your changes, and merges mods that change the same files.
 
 - **Tables:** browse the game's items, recipes, enemies, skills, quests and every other data table, with English text next to each text key. Search, and export to CSV or JSON.
-- **Editing and mod building:** change values right in the tables, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
+- **Text:** read and change the game's text in all of its languages, next to the English, and export a language to CSV for translating and import it back.
+- **Editing and mod building:** change values right in the tables and lines in the Text tab, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
 - **Merging and conflicts:** combine several mods into one merged patch so they all work, and see which installed mods, made with Cardinal or not, replace the same game files and which copy the game loads.
 - **Map:** see each floor from above, cell by cell, colored by region, plus the HLOD grids the game draws in the distance. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details, and switch on the cells installed mods replace.
 - **Command line:** everything the window does, scriptable, for batch work and AI assistants.
@@ -15,20 +16,31 @@ Cardinal reads your own copy of the game and never changes the game's own files.
 1. Open a table and double-click a value. Numbers, text, true or false, and choices can be changed; lists and groups can't yet. Cardinal checks each value against the game file before taking it, and changed values turn yellow.
 2. Every change collects in the **Mod** tab, with its original value. Select changes there to revert them, or type the original value back into the table.
 3. Give the mod a name, version, author and priority, and **Save project**. The project is a small JSON file holding only your changes (see below), so it can be rebuilt after a game update.
-4. **Build mod into a folder** or **Build and install into ~mods**. Cardinal pulls fresh copies of the files it changes from the unmodded game, applies your changes, and packs them into `<Name>_<priority>_P.utoc`, `.ucas` and `.pak`.
+4. **Build mod into a folder** or **Build and install into ~mods**. Cardinal pulls fresh copies of the files it changes from the unmodded game, applies your changes, and packs them into `<Name>_<priority>_P.utoc`, `.ucas` and `.pak`. Changed text goes in the `.pak`, so a mod that only changes text is just the `.pak`.
 
 Builds always start from the unmodded game, never from other installed mods.
 
-After a game update, **Check against the game** lists changes that can't be made any more, because a table, row or field is gone, and changes whose original value the update changed. Building again is all a rebuild needs, since every build starts fresh.
+After a game update, **Check against the game** lists changes that can't be made any more, because a table, row, field or line of text is gone, and changes whose original value or text the update changed. Building again is all a rebuild needs, since every build starts fresh.
 
 Some tables are read-only for now: the enemy blueprint list and quests (Cardinal can't write those back yet), and any table whose file can't be decoded with your mappings. The Tables tab says why. Mappings written for your exact game version, by Cardinal Mappings, usually fix the second kind.
+
+## Changing text
+
+The **Text** tab shows every line of one language at a time, next to its English, with the namespace and key that identify it. Double-click a line's text to change it; changed lines turn yellow and collect in the Mod tab with the rest of the project. Typing the game's own text back removes the change.
+
+The game keeps each language's text in one file, `Localization/Game/<language>/Game.locres`, and a mod can only replace that file whole. So a text mod carries every line of each language it touches, not only the changed ones. Two things follow:
+
+- **Rebuild text mods after every game update.** An old build would put back the text from before the update in that whole language. **Check against the game** lists lines the update changed.
+- **Two text mods for the same language always conflict.** Only one mod's text shows. Merge them (see below) to keep every change.
+
+**Translating:** **Export for translating** writes a CSV with `Namespace`, `Key`, `English` and `Text` columns for the chosen language, with the open project's changes already in the `Text` column. Translate the `Text` column in any spreadsheet and keep the rest as it is, then **Import translation** reads it back into the project. Lines the game doesn't have are skipped and listed, and lines whose English has changed since the export are imported but listed too, since their translation may need another look. The CSV is UTF-8.
 
 ## Mods that change the same files
 
 A mod replaces whole game files, so two mods that change the same file can't both work: the game loads one copy and ignores the other. Which one it loads is decided by the number before `_P` in the file name, the patch priority. Higher wins, equal priorities are left to chance, and a name ending in just `_P` ranks the same as the game's own update (`pakchunk0-WindowsClient_0_P`), so that's left to chance too.
 
 - **Priorities:** a project's `priority` goes from 1 to 9998, default 1000, and becomes part of the file name, as in `MyMod_1000_P`. Load order is just priorities: give the mod that should win the higher number.
-- **Merging (Merge tab):** add the projects in order and build one `CardinalMerged_9999_P` patch from all their changes. Where two set the same value, the later one in the list wins, and the tab lists every such value. 9999 is kept for the merged patch so it outranks every mod it was made from. When installing it, Cardinal offers to remove those mods' own builds from `~mods`, since the merged patch has all their changes. The list is saved with your settings.
+- **Merging (Merge tab):** add the projects in order and build one `CardinalMerged_9999_P` patch from all their changes. Where two set the same value or line of text, the later one in the list wins, and the tab lists every such value and line. 9999 is kept for the merged patch so it outranks every mod it was made from. When installing it, Cardinal offers to remove those mods' own builds from `~mods`, since the merged patch has all their changes. The list is saved with your settings.
 - **Conflicts (Installed mods tab):** scans everything under `Paks`, including mods not made with Cardinal, and lists each game file more than one mod replaces, or that a mod replaces without outranking the game, with what the game ends up loading. **Show cells installed mods replace** on the Map tab colors those map cells by the mod that wins them, and red where it's left to chance.
 - **Copy diagnostic info** in the status bar copies Cardinal's version, the game's version, your setup and installed mods for a bug report. It never includes your key, and paths show up relative to the game folder or as bare file names.
 
@@ -54,6 +66,11 @@ Cardinal.exe list floors
 Cardinal.exe list layers WL02
 Cardinal.exe export tables --out DIR [--only Items/MaterialItem,Skills/DT_ActiveSkillList]
 Cardinal.exe export map WL02|all --out DIR
+Cardinal.exe list cultures
+Cardinal.exe text get CULTURE KEY
+Cardinal.exe text set PROJECT.json CULTURE NAMESPACE KEY TEXT
+Cardinal.exe text export CULTURE --out FILE.csv [--project PROJECT.json]
+Cardinal.exe text import CULTURE FILE.csv PROJECT.json
 Cardinal.exe set PROJECT.json TABLE ROW FIELD VALUE
 Cardinal.exe build PROJECT.json --out DIR
 Cardinal.exe build PROJECT.json --install [--force]
@@ -67,12 +84,15 @@ Cardinal.exe help
 
 - `list tables` prints each table's id, source and `editable` or `read-only`.
 - `set` checks one change against the game file and saves it in the project, creating the project if it doesn't exist. `FIELD` is the column name as the table shows it, such as `CoolTime` or `QuestData.Floor`. Setting a field back to its original value removes the change. Example: `Cardinal.exe set MyMod.json Skills/DT_ActiveSkillList 0 CoolTime 2.5`.
+- `list cultures` prints each language the game has text for: its code (`en`, `ja-JP`, ...), name and number of lines. `CULTURE` takes the code, in any case.
+- `text get` prints every line with that key in that language: namespace, key and text, tab-separated. `text set` changes one line in the project, like `set` does for values. Output is UTF-8.
+- `text export` and `text import` are the translating round trip described in [Changing text](#changing-text). `text import` exits with 5 when it skipped or flagged any line.
 - `build` checks every change first and builds nothing if any is wrong. `--install` builds straight into `Paks\~mods` and refuses to replace an earlier build of the same mod unless you add `--force`.
 - `check` re-checks every change against the current game. Each problem line starts with `can't build` or `changed` (the original value is different now; the change still applies).
-- `merge` prints every value more than one project sets and which wins, then builds `CardinalMerged_9999_P`. `--remove-single-builds` deletes the merged projects' own builds from `~mods`.
+- `merge` prints every value and line of text more than one project sets and which wins, then builds `CardinalMerged_9999_P`. `--remove-single-builds` deletes the merged projects' own builds from `~mods`.
 - `conflicts` prints a `mod` line per installed mod and a `conflict` line per game file, tab-separated, with what the game loads.
 - `diagnostics` prints the same report as the window's **Copy diagnostic info**.
-- `set`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
+- `set`, `text set`, `text import`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
 
 Output goes to stdout, errors to stderr. Exit codes:
 
@@ -80,23 +100,25 @@ Output goes to stdout, errors to stderr. Exit codes:
 |---|---|
 | 0 | Done |
 | 1 | Bad arguments, unknown command, table or row, or a change that can't be made (wrong type, read-only table) |
-| 2 | Setup missing or wrong (paks, key, mappings, Oodle, retoc), or the files didn't open with that key |
+| 2 | Setup missing or wrong (paks, key, mappings, Oodle, retoc, repak), or the files didn't open with that key |
 | 3 | Something couldn't be found or read in the game files. `export tables` still writes the rest and lists failures in `tables.json` |
 | 4 | Writing the output failed, or `--install` found an earlier build without `--force` |
-| 5 | `check` or `conflicts` found something to look at |
+| 5 | `check`, `conflicts` or `text import` found something to look at |
 
 ## Mod projects
 
-A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 1.
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 2, which added `textEdits`. Version 1 files open unchanged, and are saved as version 2.
 
 ```json
-{ "formatVersion": 1, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
-  "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ] }
+{ "formatVersion": 2, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
+  "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ],
+  "textEdits": [ { "culture": "en", "namespace": "ST_DatabaseLocalizeList", "key": "...", "value": "New text", "original": "Old text" } ] }
 ```
 
 - `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
 - `value`: the new value as text. Enum values can be written with or without their type, as `Crystal02` or `EDropGimmick::Crystal02`.
 - `original`: the unmodded value when the change was made, for reference. Builds don't need it.
+- `textEdits`: `culture` is a code from `list cultures`, `namespace` and `key` identify the line, `value` is the new text and `original` the game's text when the change was made.
 - `priority`: 1 to 9998, default 1000 when missing. The built files are named after `name` (letters, digits, dashes and underscores) plus `_<priority>_P`, so `FasterRecovery_1000_P`. Any priority makes the mod outrank the game's own patch; see [Mods that change the same files](#mods-that-change-the-same-files).
 
 ## Export formats
@@ -163,10 +185,10 @@ The CSVs hold the same cells and markers flat. `layers` in the cells CSV is join
 
 Needs the .NET 10 SDK. `build.ps1` keeps the SDK and every NuGet and .NET cache under `CARDINAL_TOOLS` (default `D:\dev-tools`) and temp files under `CARDINAL_SCRATCH` (default `obj\scratch`); set those to change where they go.
 
-Building mods needs `retoc.exe` beside `Cardinal.exe`. The project copies it from `..\tools\retoc\retoc.exe` (not committed), or from the path in the `RetocExe` MSBuild property. retoc downloads `oo2core_9_win64.dll` next to itself the first time it runs; `publish` deletes any such copy so it never ships.
+Building mods needs `retoc.exe` and `repak.exe` beside `Cardinal.exe`. The project copies them from `..\tools\retoc\retoc.exe` and `..\tools\repak\repak.exe` (not committed), or from the paths in the `RetocExe` and `RepakExe` MSBuild properties. retoc downloads `oo2core_9_win64.dll` next to itself the first time it runs; `publish` deletes any such copy so it never ships.
 
-`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects, building, merging and the conflict scan (UAssetAPI edits the extracted files, retoc extracts and packs them). `src/Cardinal` is the window and the command line, and both call the same core code.
+`src/Cardinal.Core` reads the game: settings, the CUE4Parse session, tables, floor maps and the exporters, plus `Mods/` for projects, building, merging and the conflict scan (UAssetAPI edits the extracted files, retoc extracts and packs them, repak packs text) and `Text/` for the game's text (Cardinal reads and writes `.locres` files itself). `src/Cardinal` is the window and the command line, and both call the same core code.
 
 ## Credits
 
-Built on [CUE4Parse](https://github.com/FabianFG/CUE4Parse), [UAssetAPI](https://github.com/atenfyr/UAssetAPI) and [retoc](https://github.com/trumank/retoc). See `THIRD_PARTY_NOTICES.md`.
+Built on [CUE4Parse](https://github.com/FabianFG/CUE4Parse), [UAssetAPI](https://github.com/atenfyr/UAssetAPI), [retoc](https://github.com/trumank/retoc) and [repak](https://github.com/trumank/repak). See `THIRD_PARTY_NOTICES.md`.

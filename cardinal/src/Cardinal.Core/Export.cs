@@ -113,7 +113,7 @@ public static class Export
 
     static string Num(double? value) => value?.ToString("0.###", CultureInfo.InvariantCulture) ?? "";
 
-    static void WriteCsv(string path, IReadOnlyList<string> columns, IReadOnlyList<string[]> rows)
+    internal static void WriteCsv(string path, IReadOnlyList<string> columns, IReadOnlyList<string[]> rows)
     {
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(",", columns.Select(Quote)));

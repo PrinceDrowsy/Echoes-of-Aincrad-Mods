@@ -2,6 +2,7 @@ using System.IO;
 using Cardinal.Maps;
 using Cardinal.Mods;
 using Cardinal.Tables;
+using Cardinal.Text;
 using UAssetAPI.Unversioned;
 
 namespace Cardinal;
@@ -12,7 +13,7 @@ static class Cli
     const int Ok = 0, Usage = 1, Setup = 2, ReadFailed = 3, WriteFailed = 4, Found = 5;
 
     static readonly string Help = $"""
-        Cardinal {Diagnostics.Version} - reads Echoes of Aincrad's game files and builds data mods. Run with no arguments for the window.
+        Cardinal {Diagnostics.Version} - reads Echoes of Aincrad's game files and builds data and text mods. Run with no arguments for the window.
 
         Commands:
           setup [--paks DIR] [--key HEX] [--usmap FILE] [--oodle FILE] [--download-oodle]
@@ -21,6 +22,7 @@ static class Cli
           list tables              Every table: id, row source, and "editable" or "read-only".
           list floors              Floors with a World Partition map.
           list layers FLOOR        A floor's data layers: name, parent, developer, cell count.
+          list cultures            Languages the game has text for: code, name, number of lines.
           export tables --out DIR [--only ID[,ID...]]
                 JSON and CSV per table in DIR/Group/, plus DIR/tables.json.
           export map FLOOR|all --out DIR
@@ -28,22 +30,31 @@ static class Cli
           set PROJECT TABLE ROW FIELD VALUE
                 Checks one change against the game and saves it in the mod project (made if missing).
                 Setting a field back to its original value removes the change.
+          text get CULTURE KEY
+                Every line with that key in that language: namespace, key, text.
+          text set PROJECT CULTURE NAMESPACE KEY TEXT
+                Changes one line of text in the mod project (made if missing). The game's own text removes the change.
+          text export CULTURE --out FILE [--project PROJECT]
+                CSV of every line in that language next to its English, with the project's changes applied.
+          text import CULTURE FILE PROJECT
+                Reads a translated CSV from text export back into the project, and lists lines that don't
+                exist in the game or whose English changed since the export.
           check PROJECT
                 Re-checks every change against the current game, for example after a game update.
           build PROJECT --out DIR
           build PROJECT --install [--force]
-                Builds the project into NAME_PRIORITY_P.utoc, .ucas and .pak, in DIR or straight into Paks\~mods.
-                --force replaces an earlier build there.
+                Builds the project into NAME_PRIORITY_P.utoc and .ucas for value changes and NAME_PRIORITY_P.pak,
+                which holds changed text, in DIR or straight into Paks\~mods. --force replaces an earlier build there.
           merge PROJECT PROJECT... --out DIR
           merge PROJECT PROJECT... --install [--force] [--remove-single-builds]
                 Combines the projects into one {ModMerge.Name}_{ModProject.MergedPriority}_P patch. Where two change the
-                same value, the one listed later wins. --remove-single-builds deletes their own builds from ~mods.
+                value or line of text, the one listed later wins. --remove-single-builds deletes their own builds from ~mods.
           conflicts
                 Lists files that more than one installed mod replaces, and which copy the game loads.
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        set, check, build and merge always work from the unmodded game.
+        set, text set, text import, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
         3 a game file couldn't be read, 4 writing failed or a build is already installed,
@@ -67,6 +78,11 @@ static class Cli
                 2 when Word(0) == "list" && Word(1) == "tables" => WithGame(options, (game, _) => ListTables(game)),
                 2 when Word(0) == "list" && Word(1) == "floors" => WithGame(options, (game, _) => Lines(FloorMap.Floors(game))),
                 3 when Word(0) == "list" && Word(1) == "layers" => WithGame(options, (game, _) => ListLayers(game, w[2])),
+                2 when Word(0) == "list" && Word(1) == "cultures" => WithGame(options, (game, _) => ListCultures(game)),
+                4 when Word(0) == "text" && Word(1) == "get" => WithGame(options, (game, _) => GetText(game, w[2], w[3])),
+                7 when Word(0) == "text" && Word(1) == "set" => WithUnmoddedGame(options, (game, _) => SetText(game, w[2], w[3], w[4], w[5], w[6])),
+                3 when Word(0) == "text" && Word(1) == "export" => WithGame(options, (game, _) => ExportText(game, w[2], options)),
+                5 when Word(0) == "text" && Word(1) == "import" => WithUnmoddedGame(options, (game, _) => ImportText(game, w[2], w[3], w[4])),
                 2 when Word(0) == "export" && Word(1) == "tables" => WithGame(options, (game, _) => ExportTables(game, options)),
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
                 6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
@@ -174,6 +190,62 @@ static class Cli
         return Ok;
     }
 
+    static int ListCultures(Game game) =>
+        Lines(GameText.Cultures(game).Select(c => $"{c}\t{GameText.Name(c)}\t{GameText.Load(game, c).Count}"));
+
+    static string Culture(Game game, string culture) =>
+        GameText.Find(game, culture) ?? throw new ArgumentException($"The game has no text in {culture}. Run Cardinal list cultures.");
+
+    static ModProject OpenOrNew(string path) =>
+        File.Exists(path) ? ModProject.Load(path) : new ModProject { Name = Path.GetFileNameWithoutExtension(path) };
+
+    static int GetText(Game game, string culture, string key)
+    {
+        var lines = GameText.Load(game, Culture(game, culture)).Lines.Where(l => l.Key == key).ToList();
+        if (lines.Count == 0)
+            throw new EditException($"{culture} has no line with the key {key}.");
+        return Lines(lines.Select(l => $"{l.Namespace}\t{l.Key}\t{l.Text}"));
+    }
+
+    static int SetText(Game game, string projectPath, string culture, string ns, string key, string text)
+    {
+        culture = Culture(game, culture);
+        var project = OpenOrNew(projectPath);
+        var original = TextEditing.Set(project, GameText.Load(game, culture), culture, ns, key, text);
+        project.Save(projectPath);
+        Console.WriteLine(text == original
+            ? $"{culture} / {ns} / {key} is back to the game's own text; change removed."
+            : $"{culture} / {ns} / {key}: {original} -> {text}. {project.Changes} changes in {projectPath}");
+        return Ok;
+    }
+
+    static int ExportText(Game game, string culture, Options options)
+    {
+        culture = Culture(game, culture);
+        var project = options.Value("project") is { } path ? LoadProject(path) : new ModProject();
+        var output = options.Required("out");
+        TextEditing.ExportCsv(project, GameText.Load(game, GameText.English), GameText.Load(game, culture), culture, output);
+        Console.WriteLine($"Saved {culture} next to its English to {output}");
+        return Ok;
+    }
+
+    static int ImportText(Game game, string culture, string csvPath, string projectPath)
+    {
+        culture = Culture(game, culture);
+        if (!File.Exists(csvPath))
+            throw new ArgumentException($"No file at {csvPath}.");
+        var project = OpenOrNew(projectPath);
+        var result = TextEditing.ImportCsv(project, GameText.Load(game, GameText.English), GameText.Load(game, culture), culture, csvPath);
+        project.Save(projectPath);
+        foreach (var line in result.Missing)
+            Console.WriteLine($"not in the game  {line}");
+        foreach (var line in result.EnglishChanged)
+            Console.WriteLine($"English changed  {line}");
+        Console.WriteLine($"Imported {result.Changed} changed lines into {projectPath} ({result.Unchanged} already matched). " +
+                          $"Not in the game: {result.Missing.Count}. English changed since the export: {result.EnglishChanged.Count}.");
+        return result.Missing.Count + result.EnglishChanged.Count == 0 ? Ok : Found;
+    }
+
     static int SetValue(Game game, Settings settings, string projectPath, string tableId, string row, string field, string value)
     {
         var source = TableCatalog.Discover(game).FirstOrDefault(s => s.Id.Equals(tableId, StringComparison.OrdinalIgnoreCase))
@@ -190,9 +262,7 @@ static class Cli
         if (asset.Check(target, edit) is { } problem)
             throw new EditException(problem);
 
-        var project = File.Exists(projectPath)
-            ? ModProject.Load(projectPath)
-            : new ModProject { Name = Path.GetFileNameWithoutExtension(projectPath) };
+        var project = OpenOrNew(projectPath);
         var unchanged = ModEdit.Same(value, original);
         if (unchanged)
             project.Remove(source.Id, row, field);
@@ -201,7 +271,7 @@ static class Cli
         project.Save(projectPath);
         Console.WriteLine(unchanged
             ? $"{source.Id} / {row} / {field} is back to its original value; change removed."
-            : $"{source.Id} / {row} / {field}: {original} -> {value}. {project.Edits.Count} changes in {projectPath}");
+            : $"{source.Id} / {row} / {field}: {original} -> {value}. {project.Changes} changes in {projectPath}");
         return Ok;
     }
 
@@ -211,7 +281,7 @@ static class Cli
         var files = options.Has("install")
             ? ModBuilder.Install(game, settings, project, options.Has("force"))
             : ModBuilder.Build(game, settings, project, options.Required("out"));
-        Console.WriteLine($"Built {project.Edits.Count} changes into:");
+        Console.WriteLine($"Built {project.Changes} changes into:");
         return Lines(files);
     }
 
@@ -225,8 +295,8 @@ static class Cli
         foreach (var problem in problems)
             Console.WriteLine($"{(problem.Blocks ? "can't build" : "changed   ")}  {problem}");
         Console.WriteLine(problems.Count == 0
-            ? $"All {project.Edits.Count} changes still fit the game."
-            : $"Of {project.Edits.Count} changes, can't be made any more: {problems.Count(p => p.Blocks)}. Original value changed: {problems.Count(p => !p.Blocks)}.");
+            ? $"All {project.Changes} changes still fit the game."
+            : $"Of {project.Changes} changes, can't be made any more: {problems.Count(p => p.Blocks)}. Original value changed: {problems.Count(p => !p.Blocks)}.");
         return problems.Count == 0 ? Ok : Found;
     }
 
@@ -239,7 +309,7 @@ static class Cli
         var files = options.Has("install")
             ? ModBuilder.Install(game, settings, merged, options.Has("force"))
             : ModBuilder.Build(game, settings, merged, options.Required("out"));
-        Console.WriteLine($"Merged {projects.Count} projects, {merged.Edits.Count} changes, {clashes.Count} decided by order, into:");
+        Console.WriteLine($"Merged {projects.Count} projects, {merged.Changes} changes, {clashes.Count} decided by order, into:");
         Lines(files);
         if (options.Has("install") && options.Has("remove-single-builds"))
             foreach (var file in projects.SelectMany(p => ModBuilder.Installed(settings, p)))
@@ -283,7 +353,7 @@ static class Cli
     sealed class Options
     {
         static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds"];
-        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only"];
+        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.
         public List<string> Words { get; } = [];
@@ -312,15 +382,18 @@ static class Cli
 
         public string? Value(string name) => values.GetValueOrDefault(name);
 
+        string? Full(string name) => Value(name) is { } path ? Path.GetFullPath(path) : null;
+
         public string Required(string name) =>
             Value(name) ?? throw new ArgumentException($"--{name} is required for this command.");
 
         public Settings Apply(Settings settings)
         {
-            settings.PaksFolder = Value("paks") ?? settings.PaksFolder;
+            // Full paths, since retoc and repak run from Cardinal's own folder.
+            settings.PaksFolder = Full("paks") ?? settings.PaksFolder;
             settings.AesKey = Value("key") ?? settings.AesKey;
-            settings.MappingsFile = Value("usmap") ?? settings.MappingsFile;
-            settings.OodleFile = Value("oodle") ?? settings.OodleFile;
+            settings.MappingsFile = Full("usmap") ?? settings.MappingsFile;
+            settings.OodleFile = Full("oodle") ?? settings.OodleFile;
             return settings;
         }
     }

@@ -104,6 +104,52 @@
                 </Grid>
             </TabItem>
 
+            <TabItem Header="Text" x:Name="TextTab" IsEnabled="False">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="4">
+                        <TextBlock DockPanel.Dock="Left" Text="Language" VerticalAlignment="Center" Margin="2,0,6,0" />
+                        <ComboBox x:Name="CultureBox" DockPanel.Dock="Left" Width="240" SelectionChanged="CultureSelected" DisplayMemberPath="Name" />
+                        <Button DockPanel.Dock="Right" Content="Import translation..." Margin="4,0,0,0" Padding="8,2" Click="ImportTranslation" />
+                        <Button DockPanel.Dock="Right" Content="Export for translating..." Margin="4,0,0,0" Padding="8,2" Click="ExportTranslation" />
+                        <TextBlock DockPanel.Dock="Left" Text="Search" VerticalAlignment="Center" Margin="16,0,6,0" />
+                        <TextBox x:Name="TextSearchBox" TextChanged="TextSearchChanged" />
+                    </DockPanel>
+                    <TextBlock x:Name="TextInfo" DockPanel.Dock="Top" Margin="6,0,6,4" Foreground="Gray" TextWrapping="Wrap" />
+                    <DataGrid x:Name="TextGrid" AutoGenerateColumns="False" EnableRowVirtualization="True"
+                              HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False" SelectionUnit="Cell"
+                              CellEditEnding="TextEdited">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Namespace" Binding="{Binding Namespace, Mode=OneWay}" IsReadOnly="True" Width="180" />
+                            <DataGridTextColumn Header="Key" Binding="{Binding Key, Mode=OneWay}" IsReadOnly="True" Width="220" />
+                            <DataGridTextColumn Header="English" Binding="{Binding English, Mode=OneWay}" IsReadOnly="True" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Text" Binding="{Binding Text}" Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="TextWrapping" Value="Wrap" />
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                                <DataGridTextColumn.CellStyle>
+                                    <Style TargetType="DataGridCell">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Changed}" Value="True">
+                                                <Setter Property="Background" Value="#FFEC96" />
+                                                <Setter Property="Foreground" Value="Black" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </DataGridTextColumn.CellStyle>
+                            </DataGridTextColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+
             <TabItem Header="Map" x:Name="MapTab" IsEnabled="False">
                 <Grid>
                     <Grid.ColumnDefinitions>
@@ -139,8 +185,9 @@
             <TabItem Header="Mod" x:Name="ModTab" IsEnabled="False">
                 <DockPanel Margin="12">
                     <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
-                        Edit values in the Tables tab (double-click a cell) and they collect here. A project only stores your changes,
-                        so it can be rebuilt after a game update, and every build starts from the unmodded game.
+                        Edit values in the Tables tab and text in the Text tab (double-click a cell) and they collect here. A project only
+                        stores your changes, so it can be rebuilt after a game update, and every build starts from the unmodded game.
+                        Changed text goes in with the rest of that language's lines, so rebuild text mods after every game update.
                     </TextBlock>
                     <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Grid.ColumnDefinitions>
@@ -186,11 +233,10 @@
                     <ListView x:Name="EditList" SelectionMode="Extended">
                         <ListView.View>
                             <GridView>
-                                <GridViewColumn Header="Table" Width="220" DisplayMemberBinding="{Binding Table}" />
-                                <GridViewColumn Header="Row" Width="140" DisplayMemberBinding="{Binding Row}" />
-                                <GridViewColumn Header="Field" Width="220" DisplayMemberBinding="{Binding Field}" />
-                                <GridViewColumn Header="Original" Width="160" DisplayMemberBinding="{Binding Original}" />
-                                <GridViewColumn Header="New value" Width="160" DisplayMemberBinding="{Binding Value}" />
+                                <GridViewColumn Header="Kind" Width="60" DisplayMemberBinding="{Binding Kind}" />
+                                <GridViewColumn Header="What" Width="480" DisplayMemberBinding="{Binding What}" />
+                                <GridViewColumn Header="Original" Width="240" DisplayMemberBinding="{Binding Original}" />
+                                <GridViewColumn Header="New value" Width="240" DisplayMemberBinding="{Binding Value}" />
                             </GridView>
                         </ListView.View>
                     </ListView>
@@ -201,7 +247,8 @@
                 <DockPanel Margin="12">
                     <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
                         Mods that change the same game file replace each other, so only one of them works. Merging builds one patch from
-                        all of their changes instead. Where two set the same value, the one lower in the list wins. The merged patch has the
+                        all of their changes instead. Text mods always need it, since each one replaces a whole language.
+                        Where two set the same value or line, the one lower in the list wins. The merged patch has the
                         top priority, so it wins over the mods it was made from.
                     </TextBlock>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
@@ -230,13 +277,11 @@
                                 </GridView>
                             </ListView.View>
                         </ListView>
-                        <TextBlock Grid.Row="1" Text="Values more than one mod sets" FontWeight="Bold" Margin="0,8,0,4" />
+                        <TextBlock Grid.Row="1" Text="Values and text more than one mod sets" FontWeight="Bold" Margin="0,8,0,4" />
                         <ListView x:Name="ClashList" Grid.Row="2">
                             <ListView.View>
                                 <GridView>
-                                    <GridViewColumn Header="Table" Width="220" DisplayMemberBinding="{Binding Table}" />
-                                    <GridViewColumn Header="Row" Width="120" DisplayMemberBinding="{Binding Row}" />
-                                    <GridViewColumn Header="Field" Width="180" DisplayMemberBinding="{Binding Field}" />
+                                    <GridViewColumn Header="What" Width="520" DisplayMemberBinding="{Binding Change}" />
                                     <GridViewColumn Header="Values" Width="360" DisplayMemberBinding="{Binding Values}" />
                                     <GridViewColumn Header="Wins" Width="140" DisplayMemberBinding="{Binding Winner}" />
                                 </GridView>

@@ -7,6 +7,7 @@ using System.Windows.Media;
 using Cardinal.Maps;
 using Cardinal.Mods;
 using Cardinal.Tables;
+using Cardinal.Text;
 using Microsoft.Win32;
 using Newtonsoft.Json.Linq;
 using UAssetAPI.Unversioned;
@@ -43,6 +44,11 @@ public partial class MainWindow : Window
 
     // The last scan of Paks\~mods, shared by the Installed mods tab and the map. Null until something asks for it.
     ModConflicts? installed;
+
+    // The unmodded game's text by culture, read when a language is first shown.
+    readonly Dictionary<string, Locres> texts = new(StringComparer.OrdinalIgnoreCase);
+    string? culture;
+    List<TextRow> textRows = [];
 
     ModProject project = new();
     string? projectPath;
@@ -135,7 +141,7 @@ public partial class MainWindow : Window
         var opened = await Run("Opening the game files...", () =>
         {
             var g = Game.Open(settings);
-            return (Game: g, Tables: TableCatalog.Discover(g), Floors: FloorMap.Floors(g));
+            return (Game: g, Tables: TableCatalog.Discover(g), Floors: FloorMap.Floors(g), Cultures: GameText.Cultures(g));
         });
         if (opened.Game is null)
             return;
@@ -146,13 +152,17 @@ public partial class MainWindow : Window
         assets.Clear();
         mappings = null;
         installed = null;
+        texts.Clear();
+        culture = null;
         ModCellsBox.IsChecked = false;
         var view = new ListCollectionView(opened.Tables.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TableSource.Group)));
         TableList.ItemsSource = view;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
-        TablesTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
+        CultureBox.ItemsSource = opened.Cultures.Select(c => new CultureItem(c, GameText.Name(c))).ToList();
+        CultureBox.SelectedIndex = opened.Cultures.ToList().FindIndex(c => c == GameText.English);
+        TablesTab.IsEnabled = TextTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
         ShowMergeList();
         Status.Text = $"Opened. {opened.Tables.Count} tables and {opened.Floors.Count} floors found.";
         Tabs.SelectedItem = TablesTab;
@@ -324,6 +334,114 @@ public partial class MainWindow : Window
         TableInfo.Text = $"{table.Source}  |  {shown.Count} of {table.Rows.Count} rows, {table.Columns.Count} columns";
     }
 
+    async void CultureSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (game is null || CultureBox.SelectedItem is not CultureItem selected)
+            return;
+        var current = game;
+        if (await Run($"Reading the {selected.Name} text...", () =>
+            {
+                Locres Text(string c) => texts.TryGetValue(c, out var t) ? t : GameText.Load(current, c);
+                return (English: Text(GameText.English), Language: Text(selected.Code));
+            }) is not { English: not null } loaded)
+            return;
+        texts[GameText.English] = loaded.English;
+        texts[selected.Code] = loaded.Language;
+        culture = selected.Code;
+        ShowText();
+        Status.Text = $"{selected.Name}: {loaded.Language.Count} lines. Double-click a line's text to change it.";
+    }
+
+    // Rebuilds the text rows from the unmodded game, with the project's text edits laid on top.
+    void ShowText()
+    {
+        if (culture is null)
+            return;
+        var english = texts[GameText.English];
+        textRows = texts[culture].Lines.Select(line =>
+        {
+            var edit = project.FindText(culture, line.Namespace, line.Key);
+            return new TextRow(line.Namespace, line.Key, english.Get(line.Namespace, line.Key) ?? "", edit?.Value ?? line.Text, edit is not null);
+        }).ToList();
+        ShowTextRows();
+    }
+
+    void TextSearchChanged(object sender, TextChangedEventArgs e) => ShowTextRows();
+
+    void ShowTextRows()
+    {
+        if (culture is null)
+            return;
+        var search = TextSearchBox.Text.Trim();
+        var shown = search.Length == 0
+            ? textRows
+            : textRows.Where(r => r.Key.Contains(search, StringComparison.OrdinalIgnoreCase)
+                                  || r.Text.Contains(search, StringComparison.OrdinalIgnoreCase)
+                                  || r.English.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+        TextGrid.ItemsSource = shown;
+        ShowTextInfo();
+    }
+
+    void ShowTextInfo()
+    {
+        if (culture is null || TextGrid.ItemsSource is not List<TextRow> shown)
+            return;
+        TextInfo.Text = $"{GameText.Name(culture)}  |  {shown.Count} of {textRows.Count} lines  |  " +
+                        $"{project.TextEdits.Count(t => t.Culture == culture)} changed by this project. " +
+                        "A mod replaces a language's text whole, so two mods that change the same language need merging.";
+    }
+
+    void TextEdited(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction != DataGridEditAction.Commit || culture is null || e.EditingElement is not TextBox box)
+            return;
+        var row = (TextRow)e.Row.Item;
+        var text = box.Text;
+        if (text == row.Text)
+            return;
+        var original = TextEditing.Set(project, texts[culture], culture, row.Namespace, row.Key, text);
+        row.Changed = text != original;
+        MarkDirty();
+        // Re-filtering here would replace the rows mid-edit and drop the typed text, so only the counts update.
+        ShowTextInfo();
+        Status.Text = row.Changed ? $"{row.Key}: changed." : $"{row.Key}: back to the game's own text.";
+    }
+
+    async void ExportTranslation(object sender, RoutedEventArgs e)
+    {
+        if (culture is null)
+            return;
+        var dialog = new SaveFileDialog { Filter = "CSV|*.csv", FileName = $"{culture}.csv" };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        var (exporting, english, language, code) = (project, texts[GameText.English], texts[culture], culture);
+        if (await Run("Exporting...", () => { TextEditing.ExportCsv(exporting, english, language, code, dialog.FileName); return true; }))
+            Status.Text = $"Saved {GameText.Name(code)} next to its English to {dialog.FileName}. Translate the Text column, then import it.";
+    }
+
+    async void ImportTranslation(object sender, RoutedEventArgs e)
+    {
+        if (culture is null)
+            return;
+        var dialog = new OpenFileDialog { Filter = "CSV|*.csv" };
+        if (dialog.ShowDialog(this) != true)
+            return;
+        var (importing, english, language, code) = (project, texts[GameText.English], texts[culture], culture);
+        if (await Run("Importing...", () => TextEditing.ImportCsv(importing, english, language, code, dialog.FileName)) is not { } result)
+            return;
+        MarkDirty();
+        ShowText();
+        var report = $"Imported {result.Changed} changed lines into {GameText.Name(code)} ({result.Unchanged} already matched).";
+        if (result.Missing.Count > 0)
+            report += $"{Environment.NewLine}{Environment.NewLine}Not in the game, so skipped ({result.Missing.Count}):{Environment.NewLine}" +
+                      string.Join(Environment.NewLine, result.Missing.Take(20)) + (result.Missing.Count > 20 ? Environment.NewLine + "..." : "");
+        if (result.EnglishChanged.Count > 0)
+            report += $"{Environment.NewLine}{Environment.NewLine}The English changed since this file was exported, so check these ({result.EnglishChanged.Count}):{Environment.NewLine}" +
+                      string.Join(Environment.NewLine, result.EnglishChanged.Take(20)) + (result.EnglishChanged.Count > 20 ? Environment.NewLine + "..." : "");
+        Status.Text = report.Split(Environment.NewLine)[0];
+        MessageBox.Show(this, report, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     string? ChooseFolder(string title)
     {
         var dialog = new OpenFolderDialog { Title = title };
@@ -366,9 +484,13 @@ public partial class MainWindow : Window
 
     void ShowEdits()
     {
-        EditList.ItemsSource = project.Edits.ToList();
+        EditList.ItemsSource = project.Edits.Select(e => new ChangeRow("Value", e.Label, e.Original, e.Value, e))
+            .Concat(project.TextEdits.Select(e => new ChangeRow("Text", e.Label, e.Original, e.Value, e)))
+            .ToList();
         var file = projectPath is null ? "not saved yet" : projectPath;
-        ModInfo.Text = $"{project.Edits.Count} changes  |  builds as {project.FileName()}.utoc, .ucas and .pak  |  project: {file}";
+        // Text goes in a .pak of its own; value changes need the .utoc and .ucas container too.
+        var builds = project.Edits.Count > 0 ? ".utoc, .ucas and .pak" : ".pak";
+        ModInfo.Text = $"{project.Changes} changes  |  builds as {project.FileName()}{builds}  |  project: {file}";
         Title = $"Cardinal - {project.Name}{(dirty ? " *" : "")}";
     }
 
@@ -400,7 +522,7 @@ public partial class MainWindow : Window
     {
         if (game is null)
             return;
-        if (project.Edits.Count == 0)
+        if (project.Changes == 0)
         {
             Status.Text = "The project has no changes to check.";
             return;
@@ -410,7 +532,7 @@ public partial class MainWindow : Window
             return;
         CheckResults.Visibility = Visibility.Visible;
         CheckResults.Text = problems.Count == 0
-            ? $"All {checking.Edits.Count} changes still fit the game."
+            ? $"All {checking.Changes} changes still fit the game."
             : string.Join(Environment.NewLine, problems.Select(p => (p.Blocks ? "Can't be made any more: " : "Original value changed: ") + p));
         Status.Text = problems.Count == 0 ? "Every change still fits the game." : $"The check found {problems.Count} things to look at.";
     }
@@ -432,7 +554,7 @@ public partial class MainWindow : Window
             {
                 var loaded = ModProject.Load(path);
                 projects.Add(loaded);
-                entries.Add(new MergeEntry(i + 1, loaded.Name, loaded.Version, loaded.Edits.Count, path));
+                entries.Add(new MergeEntry(i + 1, loaded.Name, loaded.Version, loaded.Changes, path));
             }
             catch (Exception ex) when (ex is ArgumentException or IOException)
             {
@@ -447,9 +569,9 @@ public partial class MainWindow : Window
             return;
         }
         var (merged, clashes) = ModMerge.Merge(projects);
-        ClashList.ItemsSource = clashes.Select(c => new ClashRow(c.Table, c.Row, c.Field,
+        ClashList.ItemsSource = clashes.Select(c => new ClashRow(c.Change,
             string.Join(", ", c.Values.Select(v => $"{v.Mod}: {v.Value}")), c.Winner)).ToList();
-        MergeInfo.Text = $"{projects.Count} projects, {merged.Edits.Count} changes, {clashes.Count} values decided by order. " +
+        MergeInfo.Text = $"{projects.Count} projects, {merged.Changes} changes, {clashes.Count} values decided by order. " +
                          $"Builds as {merged.FileName()}." +
                          (projects.Count < entries.Count ? " Projects that can't be read are left out." : "");
     }
@@ -636,6 +758,7 @@ public partial class MainWindow : Window
         dirty = false;
         ShowProject();
         ShowTable();
+        ShowText();
     }
 
     void NewProject(object sender, RoutedEventArgs e)
@@ -696,18 +819,25 @@ public partial class MainWindow : Window
 
     void RevertSelected(object sender, RoutedEventArgs e)
     {
-        var selected = EditList.SelectedItems.Cast<ModEdit>().ToList();
+        var selected = EditList.SelectedItems.Cast<ChangeRow>().Select(r => r.Edit).ToList();
         if (selected.Count == 0)
         {
             Status.Text = "Select the changes to revert first.";
             return;
         }
-        foreach (var edit in selected)
-        {
-            project.Remove(edit.Table, edit.Row, edit.Field);
-            ShowEdit(edit, false);
-        }
+        foreach (var change in selected)
+            switch (change)
+            {
+                case ModEdit edit:
+                    project.Remove(edit.Table, edit.Row, edit.Field);
+                    ShowEdit(edit, false);
+                    break;
+                case TextEdit edit:
+                    project.RemoveText(edit.Culture, edit.Namespace, edit.Key);
+                    break;
+            }
         MarkDirty();
+        ShowText();
         Status.Text = $"Reverted {selected.Count} changes.";
     }
 

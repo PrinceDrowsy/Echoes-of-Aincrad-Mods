@@ -9,7 +9,11 @@ static partial class Program
     static int Main(string[] args)
     {
         if (args.Length > 0)
+        {
+            // The game's text is in a dozen scripts, and the console's own code page would turn most of it into ?.
+            Console.OutputEncoding = new System.Text.UTF8Encoding(false);
             return Cli.Run(args);
+        }
 
         HideOwnConsole();
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };

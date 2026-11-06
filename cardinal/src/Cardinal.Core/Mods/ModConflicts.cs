@@ -23,8 +23,16 @@ public sealed record AssetOwners(string Asset, IReadOnlyList<Container> Holders,
             : $"{Label(Winner)} wins.";
         if (unused.Count > 0)
             text += $" {string.Join(" and ", unused)} {(unused.Count == 1 ? "is" : "are")} never used.";
+        if (Holders.Count(h => h.Installed) > 1 && Culture() is { } culture)
+            text += $" Each one holds all of the game's {Text.GameText.Name(culture)} text, so only one mod's text changes show; merge them to keep every change.";
         return text;
     }
+
+    // A language's text file, Localization/Game/<culture>/Game, which mods can only replace whole.
+    string? Culture() =>
+        Asset.StartsWith(Text.GameText.Folder, StringComparison.OrdinalIgnoreCase) && Asset.EndsWith("/Game", StringComparison.OrdinalIgnoreCase)
+            ? Asset[Text.GameText.Folder.Length..^"/Game".Length]
+            : null;
 
     static string Label(Container c) => c.Installed ? c.Name : $"the game's own {c.Name}";
 }

@@ -21,11 +21,47 @@ sealed class GridRow(int index, string[] cells) : INotifyPropertyChanged
     }
 }
 
+/// <summary>One line on the Text tab: the language's text as the open mod project has it, next to the English.</summary>
+sealed class TextRow(string ns, string key, string english, string text, bool changed) : INotifyPropertyChanged
+{
+    public string Namespace { get; } = ns;
+    public string Key { get; } = key;
+    public string English { get; } = english;
+
+    // Settable only because the grid's text column is two-way; TextEdited decides what the project keeps.
+    public string Text
+    {
+        get => text;
+        set
+        {
+            text = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Text)));
+        }
+    }
+
+    public bool Changed
+    {
+        get => changed;
+        set
+        {
+            changed = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Changed)));
+        }
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+}
+
+/// <summary>One change in the Mod tab's list. Edit is the ModEdit or TextEdit it shows.</summary>
+sealed record ChangeRow(string Kind, string What, string? Original, string Value, object Edit);
+
 /// <summary>Rows for the lists on the Merge and Installed mods tabs.</summary>
 sealed record MergeEntry(int Order, string Name, string Version, int Changes, string Path);
 
-sealed record ClashRow(string Table, string Row, string Field, string Values, string Winner);
+sealed record ClashRow(string Change, string Values, string Winner);
 
 sealed record InstalledRow(string Name, int Files, int Conflicts, int Unused);
 
 sealed record ConflictRow(string Asset, string Outcome);
+
+sealed record CultureItem(string Code, string Name);

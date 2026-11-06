@@ -16,6 +16,10 @@ Cardinal edits game assets for mods with [UAssetAPI](https://github.com/atenfyr/
 
 Cardinal builds mods with [retoc](https://github.com/trumank/retoc) by Truman Kilen and Archengius, licensed under the MIT License (`licenses/retoc-LICENSE.txt`). It ships unchanged as `retoc.exe` beside `Cardinal.exe`, which runs it as a separate program. The first time it needs Oodle, retoc downloads `oo2core_9_win64.dll` next to itself from the same [OodleUE](https://github.com/WorkingRobot/OodleUE) builds and checks it against a fixed SHA-256 hash.
 
+## repak
+
+Cardinal packs text mods with [repak](https://github.com/trumank/repak) by Truman Kilen and spuds, licensed under the MIT License or the Apache License 2.0 at your choice (`licenses/repak-LICENSE-MIT.txt`, `licenses/repak-LICENSE-APACHE.txt`). It ships unchanged as `repak.exe` beside `Cardinal.exe`, which runs it as a separate program, and only packs uncompressed files, so it never needs Oodle.
+
 ## Other libraries
 
 | Library | License | Copyright |

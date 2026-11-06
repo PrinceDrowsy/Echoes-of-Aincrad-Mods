@@ -9,6 +9,9 @@ namespace Cardinal.Mods;
 /// </summary>
 public sealed record ModEdit(string Table, string Row, string Field, string Value, string? Original = null)
 {
+    [JsonIgnore]
+    public string Label => $"{Table} / {Row} / {Field}";
+
     /// <summary>Whether two cell texts mean the same value, so 5 and 5.0, or True and true, count as unchanged.</summary>
     public static bool Same(string a, string? b)
     {
@@ -25,12 +28,23 @@ public sealed record ModEdit(string Table, string Row, string Field, string Valu
 }
 
 /// <summary>
+/// One changed line of the game's text. Culture is the language's code as the game names it (en, ja-JP),
+/// Namespace and Key identify the line. Original is the unmodded text when the edit was made.
+/// </summary>
+public sealed record TextEdit(string Culture, string Namespace, string Key, string Value, string? Original = null)
+{
+    [JsonIgnore]
+    public string Label => $"{Culture} / {Namespace} / {Key}";
+}
+
+/// <summary>
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
+/// Format 2 added text edits; format 1 files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
-    public const int CurrentFormat = 1;
+    public const int CurrentFormat = 2;
 
     // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
     // The merged patch takes the top number, so it wins over every mod it was merged from.
@@ -41,6 +55,8 @@ public sealed partial class ModProject
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         WriteIndented = true,
+        // Text edits in Japanese or Russian stay readable in the file instead of becoming \u escapes.
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public int FormatVersion { get; set; } = CurrentFormat;
@@ -50,6 +66,11 @@ public sealed partial class ModProject
     public string Description { get; set; } = "";
     public int Priority { get; set; } = DefaultPriority;
     public List<ModEdit> Edits { get; set; } = [];
+    public List<TextEdit> TextEdits { get; set; } = [];
+
+    /// <summary>Value and text edits together.</summary>
+    [JsonIgnore]
+    public int Changes => Edits.Count + TextEdits.Count;
 
     public static ModProject Load(string path)
     {
@@ -71,7 +92,12 @@ public sealed partial class ModProject
         return project;
     }
 
-    public void Save(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
+    // A format 1 file saved again becomes format 2, so an older Cardinal refuses it instead of dropping its text edits.
+    public void Save(string path)
+    {
+        FormatVersion = CurrentFormat;
+        File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
+    }
 
     public ModEdit? Find(string table, string row, string field) =>
         Edits.FirstOrDefault(e => e.Table == table && e.Row == row && e.Field == field);
@@ -88,6 +114,22 @@ public sealed partial class ModProject
 
     public bool Remove(string table, string row, string field) =>
         Find(table, row, field) is { } edit && Edits.Remove(edit);
+
+    public TextEdit? FindText(string culture, string ns, string key) =>
+        TextEdits.FirstOrDefault(e => e.Culture == culture && e.Namespace == ns && e.Key == key);
+
+    /// <summary>Adds the text edit, replacing any earlier one to the same line. An earlier edit's original text is kept.</summary>
+    public void SetText(TextEdit edit)
+    {
+        var old = FindText(edit.Culture, edit.Namespace, edit.Key);
+        if (old is not null)
+            TextEdits[TextEdits.IndexOf(old)] = edit with { Original = old.Original ?? edit.Original };
+        else
+            TextEdits.Add(edit);
+    }
+
+    public bool RemoveText(string culture, string ns, string key) =>
+        FindText(culture, ns, key) is { } edit && TextEdits.Remove(edit);
 
     /// <summary>
     /// The name the built files get: letters, digits, dashes and underscores, then the priority and _P.

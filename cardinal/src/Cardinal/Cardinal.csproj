@@ -9,7 +9,7 @@
     <UseWPF>true</UseWPF>
     <StartupObject>Cardinal.Program</StartupObject>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <Product>Cardinal</Product>
     <AssemblyTitle>Cardinal - The Cardinal System</AssemblyTitle>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
@@ -30,6 +30,14 @@
   </PropertyGroup>
   <ItemGroup Condition="Exists('$(RetocExe)')">
     <None Include="$(RetocExe)" Link="retoc.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
+  </ItemGroup>
+
+  <!-- repak (MIT or Apache-2.0) packs text mods, since the game reads its text from .pak files. Same arrangement as retoc. -->
+  <PropertyGroup>
+    <RepakExe Condition="'$(RepakExe)' == ''">$(MSBuildThisFileDirectory)..\..\..\tools\repak\repak.exe</RepakExe>
+  </PropertyGroup>
+  <ItemGroup Condition="Exists('$(RepakExe)')">
+    <None Include="$(RepakExe)" Link="repak.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" ExcludeFromSingleFile="true" />
   </ItemGroup>
 
 </Project>

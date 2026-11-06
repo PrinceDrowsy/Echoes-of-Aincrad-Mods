@@ -44,7 +44,8 @@ public static class Diagnostics
         text.AppendLine($"Mappings: {Show(settings.MappingsFile)}" +
                         (File.Exists(settings.MappingsFile) ? $", {File.GetLastWriteTime(settings.MappingsFile):yyyy-MM-dd HH:mm}" : ""));
         text.AppendLine($"Oodle: {Show(settings.OodleFile)}");
-        text.AppendLine($"retoc: {(File.Exists(Path.Combine(AppContext.BaseDirectory, "retoc.exe")) ? "present" : "missing")}");
+        foreach (var tool in new[] { "retoc", "repak" })
+            text.AppendLine($"{tool}: {(File.Exists(Path.Combine(AppContext.BaseDirectory, tool + ".exe")) ? "present" : "missing")}");
 
         var problems = settings.Problems().ToList();
         text.AppendLine(problems.Count == 0 ? "Setup: complete" : "Setup problems:");
