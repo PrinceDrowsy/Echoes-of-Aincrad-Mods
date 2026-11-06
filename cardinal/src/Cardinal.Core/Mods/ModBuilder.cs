@@ -12,6 +12,10 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(TextEdit edit, string problem, bool blocks) : this($"text {edit.Label}", problem, blocks) { }
 
+    public EditProblem(RowAddition row, string problem) : this($"new row {row.Label}", problem, true) { }
+
+    public EditProblem(AddedText text, string problem) : this($"new text {text.Label}", problem, true) { }
+
     public override string ToString() => $"{Change}: {Problem}";
 }
 
@@ -40,12 +44,11 @@ public static class ModBuilder
         try
         {
             var files = new List<string>();
-            if (plan.Count > 0)
+            if (plan.Assets.Count > 0)
             {
                 var assets = Path.Combine(stage, "assets");
-                foreach (var (asset, target, edit) in plan)
-                    asset.Apply(target, edit);
-                foreach (var asset in plan.Select(p => p.Asset).Distinct())
+                plan.Steps.ForEach(step => step());
+                foreach (var asset in plan.Assets)
                     asset.Write(Path.Combine(assets, asset.File));
                 files.AddRange(Retoc.Pack(assets, output, project.FileName()));
             }
@@ -102,35 +105,74 @@ public static class ModBuilder
         return problems;
     }
 
-    static (List<(EditableAsset Asset, EditTarget Target, ModEdit Edit)> Plan, List<EditProblem> Problems) Plan(
-        Game game, Settings settings, ModProject project)
+    /// <summary>The game assets a project changes, and the steps that change them, in the order they run.</summary>
+    sealed record AssetPlan(List<EditableAsset> Assets, List<Action> Steps);
+
+    // Added rows go in before value edits, so a new row is always a copy of the game's own row, whatever else the mod changes.
+    static (AssetPlan Plan, List<EditProblem> Problems) Plan(Game game, Settings settings, ModProject project)
     {
         var problems = new List<EditProblem>();
-        var plan = new List<(EditableAsset, EditTarget, ModEdit)>();
-        if (project.Edits.Count == 0)
+        var plan = new AssetPlan([], []);
+        if (project.Edits.Count + project.AddedRows.Count + project.AddedText.Count == 0)
             return (plan, problems);
 
         var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
         var mappings = new Usmap(settings.MappingsFile!);
         var assets = new Dictionary<string, EditableAsset>();
+        EditableAsset Asset(string file)
+        {
+            if (!assets.TryGetValue(file, out var asset))
+            {
+                assets[file] = asset = EditableAsset.Load(settings, mappings, file);
+                plan.Assets.Add(asset);
+            }
+            return asset;
+        }
+        EditTarget? Target(string table, Action<string> fail)
+        {
+            if (!sources.TryGetValue(table, out var source))
+                fail("no such table.");
+            else if (source.Target is null)
+                fail("this table is read-only.");
+            return sources.GetValueOrDefault(table)?.Target;
+        }
+
+        foreach (var row in project.AddedRows)
+        {
+            if (Target(row.Table, p => problems.Add(new EditProblem(row, p))) is not { } target)
+                continue;
+            var asset = Asset(target.File);
+            if (asset.Check(target, row) is { } problem)
+                problems.Add(new EditProblem(row, problem));
+            else
+                plan.Steps.Add(() => asset.Apply(target, row));
+        }
+
         foreach (var edit in project.Edits)
         {
-            if (!sources.TryGetValue(edit.Table, out var source))
-            {
-                problems.Add(new EditProblem(edit, "no such table.", true));
+            if (Target(edit.Table, p => problems.Add(new EditProblem(edit, p, true))) is not { } target)
                 continue;
-            }
-            if (source.Target is not { } target)
-            {
-                problems.Add(new EditProblem(edit, "this table is read-only.", true));
-                continue;
-            }
-            if (!assets.TryGetValue(target.File, out var asset))
-                assets[target.File] = asset = EditableAsset.Load(settings, mappings, target.File);
+            var asset = Asset(target.File);
             if (asset.Check(target, edit) is { } problem)
                 problems.Add(new EditProblem(edit, problem, true));
             else
-                plan.Add((asset, target, edit));
+                plan.Steps.Add(() => asset.Apply(target, edit));
+        }
+
+        foreach (var text in project.AddedText)
+        {
+            if (text.Namespace != Game.TextNamespace)
+                problems.Add(new EditProblem(text, $"new text can only go in {Game.TextNamespace}, the game's main string table."));
+            else if (string.IsNullOrWhiteSpace(text.English))
+                problems.Add(new EditProblem(text, "it has no English text. Every language without its own falls back to the English."));
+            else
+            {
+                var table = Asset(Game.TextTablePath);
+                if (table.HasText(text.Key))
+                    problems.Add(new EditProblem(text, "the game already has text with this key, so the mod would hide the game's own."));
+                else
+                    plan.Steps.Add(() => table.AddText(text.Key, text.English));
+            }
         }
         return (plan, problems);
     }
@@ -143,26 +185,40 @@ public static class ModBuilder
     {
         var files = new Dictionary<string, Locres>(StringComparer.OrdinalIgnoreCase);
         var problems = new List<EditProblem>();
-        if (project.TextEdits.Count == 0)
+        // English needs no line for added text: the string table holds the English, and it shows wherever a language has no line.
+        var translations = project.AddedText
+            .SelectMany(t => t.Text.Where(l => l.Key != GameText.English).Select(l => (Added: t, Culture: l.Key, Line: l.Value)))
+            .ToList();
+        if (project.TextEdits.Count + translations.Count == 0)
             return (files, problems);
 
         var cultures = GameText.Cultures(game);
-        foreach (var edit in project.TextEdits)
+        Locres? Language(string code, Action<string> fail)
         {
-            var culture = cultures.FirstOrDefault(c => c.Equals(edit.Culture, StringComparison.OrdinalIgnoreCase));
+            var culture = cultures.FirstOrDefault(c => c.Equals(code, StringComparison.OrdinalIgnoreCase));
             if (culture is null)
             {
-                problems.Add(new EditProblem(edit, $"the game has no text in {edit.Culture}.", true));
-                continue;
+                fail($"the game has no text in {code}.");
+                return null;
             }
             if (!files.TryGetValue(culture, out var file))
                 files[culture] = file = GameText.Load(game, culture);
-            if (Original(file, edit) is null)
-                problems.Add(new EditProblem(edit, "the game has no line with this key in this language.", true));
+            return file;
         }
+
+        foreach (var edit in project.TextEdits)
+            if (Language(edit.Culture, p => problems.Add(new EditProblem(edit, p, true))) is { } file && Original(file, edit) is null)
+                problems.Add(new EditProblem(edit, "the game has no line with this key in this language.", true));
+        foreach (var (added, culture, _) in translations)
+            Language(culture, p => problems.Add(new EditProblem(added, p)));
+
         if (apply && problems.Count == 0)
+        {
             foreach (var edit in project.TextEdits)
                 files[edit.Culture].Set(edit.Namespace, edit.Key, edit.Value);
+            foreach (var (added, culture, line) in translations)
+                files[culture].Add(added.Namespace, added.Key, line, added.English);
+        }
         return (files, problems);
     }
 

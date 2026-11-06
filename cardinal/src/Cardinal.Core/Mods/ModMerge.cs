@@ -1,6 +1,8 @@
 namespace Cardinal.Mods;
 
-/// <summary>Two or more merged mods setting the same value or line of text differently. The last one listed wins.</summary>
+/// <summary>
+/// Two or more merged mods setting the same value or line of text differently, or adding the same row. The last one listed wins.
+/// </summary>
 public sealed record MergeClash(string Change, IReadOnlyList<(string Mod, string Value)> Values)
 {
     public string Winner => Values[^1].Mod;
@@ -32,6 +34,7 @@ public static class ModMerge
         };
         var values = new Dictionary<string, List<(string Mod, string Value)>>();
         var text = new Dictionary<string, List<(string Mod, string Value)>>();
+        var rows = new Dictionary<string, List<(string Mod, string Value)>>();
         foreach (var project in projects)
         {
             foreach (var edit in project.Edits)
@@ -44,10 +47,27 @@ public static class ModMerge
                 Add(text, "text " + edit.Label, project.Name, edit.Value);
                 merged.SetText(edit);
             }
+            // Two mods adding the same row would each expect it to be theirs, so that's always a clash, even with equal values.
+            foreach (var row in project.AddedRows)
+            {
+                Add(rows, "new row " + row.Label, project.Name, $"copy of {row.From}" + string.Concat(row.Fields.Select(f => $", {f.Key} {f.Value}")));
+                merged.SetRow(row);
+            }
+            foreach (var added in project.AddedText)
+            {
+                foreach (var (culture, line) in added.Text)
+                    Add(text, $"new text {culture} / {added.Label}", project.Name, line);
+                // Translations of different English would belong to something else, so they're only combined when the English matches.
+                var earlier = merged.FindAddedText(added.Namespace, added.Key);
+                merged.SetAddedText(earlier is null || earlier.English != added.English
+                    ? added
+                    : added with { Text = new Dictionary<string, string>(earlier.Text.Concat(added.Text).GroupBy(l => l.Key).Select(g => g.Last())) });
+            }
         }
 
         var clashes = values.Where(s => s.Value.Skip(1).Any(v => !ModEdit.Same(v.Value, s.Value[0].Value)))
             .Concat(text.Where(s => s.Value.Skip(1).Any(v => v.Value != s.Value[0].Value)))
+            .Concat(rows.Where(s => s.Value.Count > 1))
             .Select(s => new MergeClash(s.Key, s.Value))
             .ToList();
         return (merged, clashes);

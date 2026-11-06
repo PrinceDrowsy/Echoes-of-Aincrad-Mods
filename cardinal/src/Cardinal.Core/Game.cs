@@ -16,16 +16,18 @@ public sealed class Game : IDisposable
 {
     public const string SteamAppId = "2244210";
     public const string ContentRoot = "EchoesofAincrad/Content/";
-    const string TextNamespace = "ST_GeneralLocalizeList";
-    const string TextTablePath = ContentRoot + "ROD/DataAssets/StringTable/ST_GeneralLocalizeList.uasset";
+    // The string table nearly all of the game's text keys live in. Its namespace in the .locres files is its own name.
+    public const string TextNamespace = "ST_GeneralLocalizeList";
+    public const string TextTablePath = ContentRoot + "ROD/DataAssets/StringTable/ST_GeneralLocalizeList.uasset";
 
     public DefaultFileProvider Provider { get; }
-    readonly HashSet<string> textKeys;
+    // The main string table's keys and their English, which shows wherever a language has no line of its own.
+    readonly Dictionary<string, string> sourceText;
 
-    Game(DefaultFileProvider provider, HashSet<string> textKeys)
+    Game(DefaultFileProvider provider, Dictionary<string, string> sourceText)
     {
         Provider = provider;
-        this.textKeys = textKeys;
+        this.sourceText = sourceText;
     }
 
     /// <summary>
@@ -37,9 +39,9 @@ public sealed class Game : IDisposable
         var provider = Mount(settings, withMods);
         provider.LoadLocalization(ELanguage.English);
 
-        var keys = provider.LoadPackageObject<CUE4Parse.UE4.Assets.Exports.Internationalization.UStringTable>(ObjectPath(TextTablePath))
-            .StringTable.KeysToEntries.Keys.ToHashSet();
-        return new Game(provider, keys);
+        var source = provider.LoadPackageObject<CUE4Parse.UE4.Assets.Exports.Internationalization.UStringTable>(ObjectPath(TextTablePath))
+            .StringTable.KeysToEntries.ToDictionary(e => e.Key, e => e.Value);
+        return new Game(provider, source);
     }
 
     /// <summary>Mounts the game's containers, and with withMods everything under Paks too, without reading any text.</summary>
@@ -75,7 +77,12 @@ public sealed class Game : IDisposable
 
     /// <summary>English text for one of the game's text keys, such as ItemName_Material_1.</summary>
     public string? Text(string? key) =>
-        key is not null && textKeys.Contains(key) ? Provider.Internationalization.SafeGet(TextNamespace, key, key) : null;
+        key is not null && sourceText.TryGetValue(key, out var english) ? Provider.Internationalization.SafeGet(TextNamespace, key, english) : null;
+
+    public bool HasText(string key) => sourceText.ContainsKey(key);
+
+    /// <summary>A main string table key's own English, before any language's line replaces it.</summary>
+    public string? SourceText(string key) => sourceText.GetValueOrDefault(key);
 
     public IEnumerable<string> FindFiles(string folder, string extension) =>
         Provider.Files.Keys

@@ -92,6 +92,9 @@
                         <DockPanel DockPanel.Dock="Top" Margin="4">
                             <Button DockPanel.Dock="Right" Content="Export all tables..." Margin="4,0,0,0" Padding="8,2" Click="ExportAllTables" />
                             <Button DockPanel.Dock="Right" Content="Export this table..." Margin="4,0,0,0" Padding="8,2" Click="ExportTable" />
+                            <Button x:Name="NewItemButton" DockPanel.Dock="Right" Content="New item from this row..." Margin="4,0,0,0" Padding="8,2"
+                                    Click="NewItemClicked" Visibility="Collapsed"
+                                    ToolTip="Adds a new item to your mod that starts as a copy of the selected one, with its own ID, name and description." />
                             <TextBlock DockPanel.Dock="Left" Text="Search" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <TextBox x:Name="SearchBox" TextChanged="SearchChanged" />
                         </DockPanel>
@@ -185,7 +188,8 @@
             <TabItem Header="Mod" x:Name="ModTab" IsEnabled="False">
                 <DockPanel Margin="12">
                     <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Foreground="Gray" Margin="0,0,0,8">
-                        Edit values in the Tables tab and text in the Text tab (double-click a cell) and they collect here. A project only
+                        Edit values in the Tables tab and text in the Text tab (double-click a cell), or add new items from the Tables tab,
+                        and they collect here. A project only
                         stores your changes, so it can be rebuilt after a game update, and every build starts from the unmodded game.
                         Changed text goes in with the rest of that language's lines, so rebuild text mods after every game update.
                     </TextBlock>

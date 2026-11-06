@@ -83,36 +83,111 @@ public sealed class EditableAsset
     {
         if (asset is null)
             throw new EditException(Problem!);
-        var fields = RowFields(target, edit.Row);
-        var parts = edit.Field.Split('.');
+        SetField(RowFields(target, edit.Row), edit.Field, edit.Value, commit);
+    }
+
+    void SetField(List<PropertyData> fields, string field, string value, bool commit)
+    {
+        var parts = field.Split('.');
         PropertyData? property = null;
         foreach (var part in parts)
         {
             property = fields.FirstOrDefault(p => p.Name.ToString() == part);
             if (property is null)
-                throw new EditException($"{edit.Field} isn't stored in this row. Fields left at their default value can't be edited yet.");
+                throw new EditException($"{field} isn't stored in this row. Fields left at their default value can't be edited yet.");
             if (part != parts[^1])
                 fields = property is StructPropertyData nested
                     ? nested.Value
-                    : throw new EditException($"{edit.Field} can't be edited: {part} isn't a plain group of fields.");
+                    : throw new EditException($"{field} can't be edited: {part} isn't a plain group of fields.");
         }
-        SetValue(property!, edit.Value, commit);
+        SetValue(property!, value, commit);
     }
+
+    /// <summary>Checks that a row can be added without changing anything. Returns why not, or null.</summary>
+    public string? Check(EditTarget target, RowAddition row)
+    {
+        try
+        {
+            Add(target, row, false);
+            return null;
+        }
+        catch (EditException e)
+        {
+            return e.Message;
+        }
+    }
+
+    public void Apply(EditTarget target, RowAddition row) => Add(target, row, true);
+
+    // The new row is a deep copy of From with its own key, so every field the game leaves at its default stays that way too.
+    void Add(EditTarget target, RowAddition row, bool commit)
+    {
+        if (asset is null)
+            throw new EditException(Problem!);
+        if (target.Map is null)
+        {
+            var rows = DataTable().Table.Data;
+            if (rows.Any(r => r.Name.ToString() == row.Key))
+                throw new EditException($"The game already has a row {row.Key}.");
+            var copy = (StructPropertyData)(rows.FirstOrDefault(r => r.Name.ToString() == row.From)
+                                            ?? throw new EditException($"There's no row {row.From} to copy.")).Clone();
+            copy.Name = Name(row.Key);
+            foreach (var (field, text) in row.Fields)
+                SetField(copy.Value, field, text, true);
+            if (commit)
+                rows.Add(copy);
+            return;
+        }
+
+        var map = Map(target);
+        if (map.Value.Keys.Any(k => KeyText(k) == row.Key))
+            throw new EditException($"The game already has a row {row.Key}.");
+        var (fromKey, fromValue) = map.Value.FirstOrDefault(e => KeyText(e.Key) == row.From);
+        if (fromKey is null)
+            throw new EditException($"There's no row {row.From} to copy.");
+        if (fromValue is not StructPropertyData entry)
+            throw new EditException($"Row {row.From} isn't a group of fields.");
+        var key = (PropertyData)fromKey.Clone();
+        SetValue(key, row.Key, true);
+        var value = (StructPropertyData)entry.Clone();
+        foreach (var (field, text) in row.Fields)
+            SetField(value.Value, field, text, true);
+        if (commit)
+            map.Value.Add(key, value);
+    }
+
+    /// <summary>Whether a string table already has a key. Only for string table assets.</summary>
+    public bool HasText(string key) => StringTable().ContainsKey(new FString(key));
+
+    /// <summary>Adds a key to a string table, with English as its text: the source every language's line translates.</summary>
+    public void AddText(string key, string english)
+    {
+        var table = StringTable();
+        if (table.ContainsKey(new FString(key)))
+            throw new EditException($"The game already has text with the key {key}.");
+        table.Add(new FString(key), new FString(english));
+    }
+
+    FStringTable StringTable() =>
+        asset?.Exports.OfType<StringTableExport>().FirstOrDefault()?.Table
+        ?? throw new EditException(Problem ?? $"{Path.GetFileName(File)} isn't a string table.");
+
+    DataTableExport DataTable() =>
+        asset!.Exports.OfType<DataTableExport>().FirstOrDefault()
+        ?? throw new EditException($"{Path.GetFileName(File)} isn't a data table.");
+
+    MapPropertyData Map(EditTarget target) =>
+        asset!.Exports.OfType<NormalExport>().SelectMany(e => e.Data).OfType<MapPropertyData>()
+            .FirstOrDefault(m => m.Name.ToString() == target.Map)
+        ?? throw new EditException($"{target.Map} wasn't found in {Path.GetFileName(File)}.");
 
     List<PropertyData> RowFields(EditTarget target, string row)
     {
         if (target.Map is null)
-        {
-            var table = asset!.Exports.OfType<DataTableExport>().FirstOrDefault()
-                        ?? throw new EditException($"{Path.GetFileName(File)} isn't a data table.");
-            return table.Table.Data.FirstOrDefault(r => r.Name.ToString() == row)?.Value
+            return DataTable().Table.Data.FirstOrDefault(r => r.Name.ToString() == row)?.Value
                    ?? throw new EditException($"There's no row {row}.");
-        }
 
-        var map = asset!.Exports.OfType<NormalExport>().SelectMany(e => e.Data).OfType<MapPropertyData>()
-                      .FirstOrDefault(m => m.Name.ToString() == target.Map)
-                  ?? throw new EditException($"{target.Map} wasn't found in {Path.GetFileName(File)}.");
-        foreach (var (key, value) in map.Value)
+        foreach (var (key, value) in Map(target).Value)
             if (KeyText(key) == row)
                 return value is StructPropertyData entry
                     ? entry.Value

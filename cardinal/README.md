@@ -1,10 +1,11 @@
 # Cardinal - The Cardinal System
 
-A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.4 reads the game, builds data and text mods from your changes, and merges mods that change the same files.
+A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Version 0.5 reads the game, builds data and text mods from your changes, adds new items, and merges mods that change the same files.
 
 - **Tables:** browse the game's items, recipes, enemies, skills, quests and every other data table, with English text next to each text key. Search, and export to CSV or JSON.
 - **Text:** read and change the game's text in all of its languages, next to the English, and export a language to CSV for translating and import it back.
 - **Editing and mod building:** change values right in the tables and lines in the Text tab, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
+- **New items:** add an item that starts as a copy of an existing one, with its own ID, name and description in any language.
 - **Merging and conflicts:** combine several mods into one merged patch so they all work, and see which installed mods, made with Cardinal or not, replace the same game files and which copy the game loads.
 - **Map:** see each floor from above, cell by cell, colored by region, plus the HLOD grids the game draws in the distance. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details, and switch on the cells installed mods replace.
 - **Command line:** everything the window does, scriptable, for batch work and AI assistants.
@@ -20,7 +21,7 @@ Cardinal reads your own copy of the game and never changes the game's own files.
 
 Builds always start from the unmodded game, never from other installed mods.
 
-After a game update, **Check against the game** lists changes that can't be made any more, because a table, row, field or line of text is gone, and changes whose original value or text the update changed. Building again is all a rebuild needs, since every build starts fresh.
+After a game update, **Check against the game** lists changes that can't be made any more, because a table, row, field or line of text is gone or the game now has a row or text key the mod adds, and changes whose original value or text the update changed. Building again is all a rebuild needs, since every build starts fresh.
 
 Some tables are read-only for now: the enemy blueprint list and quests (Cardinal can't write those back yet), and any table whose file can't be decoded with your mappings. The Tables tab says why. Mappings written for your exact game version, by Cardinal Mappings, usually fix the second kind.
 
@@ -34,6 +35,18 @@ The game keeps each language's text in one file, `Localization/Game/<language>/G
 - **Two text mods for the same language always conflict.** Only one mod's text shows. Merge them (see below) to keep every change.
 
 **Translating:** **Export for translating** writes a CSV with `Namespace`, `Key`, `English` and `Text` columns for the chosen language, with the open project's changes already in the `Text` column. Translate the `Text` column in any spreadsheet and keep the rest as it is, then **Import translation** reads it back into the project. Lines the game doesn't have are skipped and listed, and lines whose English has changed since the export are imported but listed too, since their translation may need another look. The CSV is UTF-8.
+
+## Adding items
+
+Select an item in one of the Items tables that end in `Item`, such as **HealItem**, and press **New item from this row**. Give it an ID (the next free one is filled in), an English name and a description. The new item:
+
+- is a copy of the selected one, so it has the same icon, rarity, prices and effects until you change them. Its row shows up highlighted at the bottom of the table, and you can change its values there like any other. A new icon needs The Seed, Cardinal's Unreal kit, which isn't out yet.
+- gets new text keys for its name and description in the game's main string table, named like the game's own (`ItemName_Heal_<ID>`). Every language shows the English until you give it its own: new lines are listed first on the Text tab.
+- for weapons, shields and gear, also gets copies of the source's rows in the tables that hold menu pictures by ID (such as `DT_OneHandedSwordThumbnail`). Whether the game finds a 3D model for a new ID hasn't been tested.
+
+Cardinal can't put it in a shop, chest or drop list yet: the shop list can't be written back with current mappings, and drop and chest lists are lists, which Cardinal can't edit yet. To get it in game, point an existing recipe's result at it (`ItemData.ItemId` in a recipe table) or give it to yourself with a dev mod. It also isn't added to the in-game database (`DT_ItemDatabase`).
+
+A new item changes the item asset and the main string table, so two mods that add items always replace each other's copies of those files. Merge them to keep both. Two mods adding the same ID to the same table clash, and the later one in the merge wins.
 
 ## Mods that change the same files
 
@@ -72,6 +85,7 @@ Cardinal.exe text set PROJECT.json CULTURE NAMESPACE KEY TEXT
 Cardinal.exe text export CULTURE --out FILE.csv [--project PROJECT.json]
 Cardinal.exe text import CULTURE FILE.csv PROJECT.json
 Cardinal.exe set PROJECT.json TABLE ROW FIELD VALUE
+Cardinal.exe new item PROJECT.json --from ROW --name TEXT --description TEXT [--id ID] [--category TABLE]
 Cardinal.exe build PROJECT.json --out DIR
 Cardinal.exe build PROJECT.json --install [--force]
 Cardinal.exe check PROJECT.json
@@ -92,7 +106,8 @@ Cardinal.exe help
 - `merge` prints every value and line of text more than one project sets and which wins, then builds `CardinalMerged_9999_P`. `--remove-single-builds` deletes the merged projects' own builds from `~mods`.
 - `conflicts` prints a `mod` line per installed mod and a `conflict` line per game file, tab-separated, with what the game loads.
 - `diagnostics` prints the same report as the window's **Copy diagnostic info**.
-- `set`, `text set`, `text import`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
+- `new item` adds an item to the project; see [Adding items](#adding-items). `--category` is the item table, such as `Items/HealItem`, and is needed when `ROW` is an ID in more than one. Without `--id` it takes the next free ID. For text the project adds, `text set` sets one language's line, and empty text makes that language show the English again.
+- `set`, `text set`, `text import`, `new item`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
 
 Output goes to stdout, errors to stderr. Exit codes:
 
@@ -107,18 +122,23 @@ Output goes to stdout, errors to stderr. Exit codes:
 
 ## Mod projects
 
-A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 2, which added `textEdits`. Version 1 files open unchanged, and are saved as version 2.
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 3. Version 2 added `textEdits` and version 3 `addedRows` and `addedText`. Older files open unchanged, and are saved as version 3.
 
 ```json
-{ "formatVersion": 2, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
+{ "formatVersion": 3, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
   "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ],
-  "textEdits": [ { "culture": "en", "namespace": "ST_DatabaseLocalizeList", "key": "...", "value": "New text", "original": "Old text" } ] }
+  "textEdits": [ { "culture": "en", "namespace": "ST_DatabaseLocalizeList", "key": "...", "value": "New text", "original": "Old text" } ],
+  "addedRows": [ { "table": "Items/HealItem", "key": "2", "from": "1",
+                   "fields": { "ID": "2", "ItemKey": "ItemName_Heal_2", "DescriptionKey": "ItemDescription_Heal_2" } } ],
+  "addedText": [ { "namespace": "ST_GeneralLocalizeList", "key": "ItemName_Heal_2", "text": { "en": "My Item", "ja-JP": "..." } } ] }
 ```
 
 - `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
 - `value`: the new value as text. Enum values can be written with or without their type, as `Crystal02` or `EDropGimmick::Crystal02`.
 - `original`: the unmodded value when the change was made, for reference. Builds don't need it.
 - `textEdits`: `culture` is a code from `list cultures`, `namespace` and `key` identify the line, `value` is the new text and `original` the game's text when the change was made.
+- `addedRows`: a new row in `table` with the key `key`. It starts as a copy of the game's row `from` in the same table, and `fields` replaces single values of the copy by column name. A field the copied row leaves at its default can't be set yet. Rows are added before `edits` apply, so the copy is always of the game's own row.
+- `addedText`: a new key in `namespace`, which must be `ST_GeneralLocalizeList`, the game's main string table. `text` holds a line per culture and must have `en`, which goes in the string table itself: every language without its own line shows it, as the game does for its own untranslated lines.
 - `priority`: 1 to 9998, default 1000 when missing. The built files are named after `name` (letters, digits, dashes and underscores) plus `_<priority>_P`, so `FasterRecovery_1000_P`. Any priority makes the mod outrank the game's own patch; see [Mods that change the same files](#mods-that-change-the-same-files).
 
 ## Export formats

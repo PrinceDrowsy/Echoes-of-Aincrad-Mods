@@ -2,12 +2,16 @@ using System.ComponentModel;
 
 namespace Cardinal;
 
-/// <summary>One row of the table grid: its cells as shown, and which of them the open mod project changes.</summary>
+/// <summary>
+/// One row of the table grid: its cells as shown, and which of them the open mod project changes. Added is set for a row
+/// the project adds, whose Index is then the game row it copies.
+/// </summary>
 sealed class GridRow(int index, string[] cells) : INotifyPropertyChanged
 {
     public int Index { get; } = index;
     public string[] Cells { get; } = cells;
     public bool[] Changed { get; } = new bool[cells.Length];
+    public Mods.RowAddition? Added { get; set; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -22,11 +26,14 @@ sealed class GridRow(int index, string[] cells) : INotifyPropertyChanged
 }
 
 /// <summary>One line on the Text tab: the language's text as the open mod project has it, next to the English.</summary>
-sealed class TextRow(string ns, string key, string english, string text, bool changed) : INotifyPropertyChanged
+sealed class TextRow(string ns, string key, string english, string text, bool changed, bool added = false) : INotifyPropertyChanged
 {
     public string Namespace { get; } = ns;
     public string Key { get; } = key;
     public string English { get; } = english;
+
+    /// <summary>Whether the open project adds this line rather than changing one of the game's.</summary>
+    public bool Added { get; } = added;
 
     // Settable only because the grid's text column is two-way; TextEdited decides what the project keeps.
     public string Text
@@ -52,7 +59,7 @@ sealed class TextRow(string ns, string key, string english, string text, bool ch
     public event PropertyChangedEventHandler? PropertyChanged;
 }
 
-/// <summary>One change in the Mod tab's list. Edit is the ModEdit or TextEdit it shows.</summary>
+/// <summary>One change in the Mod tab's list. Edit is the ModEdit, TextEdit, RowAddition or AddedText it shows.</summary>
 sealed record ChangeRow(string Kind, string What, string? Original, string Value, object Edit);
 
 /// <summary>Rows for the lists on the Merge and Installed mods tabs.</summary>

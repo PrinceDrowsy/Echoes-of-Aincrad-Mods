@@ -31,6 +31,7 @@ public partial class MainWindow : Window
 
     Settings settings = Settings.Load();
     Game? game;
+    IReadOnlyList<TableSource> sources = [];
     TableSource? source;
     Table? table;
     List<GridRow> rows = [];
@@ -155,6 +156,7 @@ public partial class MainWindow : Window
         texts.Clear();
         culture = null;
         ModCellsBox.IsChecked = false;
+        sources = opened.Tables;
         var view = new ListCollectionView(opened.Tables.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TableSource.Group)));
         TableList.ItemsSource = view;
@@ -180,6 +182,7 @@ public partial class MainWindow : Window
         for (var i = 0; i < loaded.Columns.Count; i++)
             Grid.Columns.Add(Column(loaded.Columns[i], i));
         ShowTable();
+        NewItemButton.Visibility = ItemTemplate.Kinds([selected]).Count > 0 ? Visibility.Visible : Visibility.Collapsed;
         Status.Text = $"{selected.Group} / {selected.Name}";
         await CheckEditable(selected);
     }
@@ -209,7 +212,32 @@ public partial class MainWindow : Window
         rows = table.Cells.Select((cells, i) => new GridRow(i, (string[])cells.Clone())).ToList();
         foreach (var edit in project.Edits.Where(e => e.Table == source.Id))
             ShowEdit(edit, true);
+        foreach (var added in project.AddedRows.Where(r => r.Table == source.Id))
+            if (AddedRow(added) is { } row)
+                rows.Add(row);
         ShowRows();
+    }
+
+    // A row the project adds, shown as the game row it copies with the key and the project's values on top, all highlighted.
+    GridRow? AddedRow(RowAddition added)
+    {
+        var from = table!.Rows.ToList().FindIndex(r => r.Key == added.From);
+        if (from < 0)
+            return null;
+        var cells = (string[])table.Cells[from].Clone();
+        cells[0] = added.Key;
+        var columns = table.Columns.ToList();
+        foreach (var (field, value) in added.Fields)
+        {
+            if (columns.IndexOf(field) is var column and > 0)
+                cells[column] = value;
+            if (columns.IndexOf(field + " (text)") is var textColumn and > 0)
+                cells[textColumn] = project.FindAddedText(Game.TextNamespace, value)?.English ?? game?.Text(value) ?? "";
+        }
+        var row = new GridRow(from, cells) { Added = added };
+        for (var column = 0; column < cells.Length; column++)
+            row.Changed[column] = true;
+        return row;
     }
 
     void ShowEdit(ModEdit edit, bool applied)
@@ -217,7 +245,7 @@ public partial class MainWindow : Window
         if (table is null || source?.Id != edit.Table)
             return;
         var column = table.Columns.ToList().IndexOf(edit.Field);
-        var row = rows.FirstOrDefault(r => table.Rows[r.Index].Key == edit.Row);
+        var row = rows.FirstOrDefault(r => r.Added is null && table.Rows[r.Index].Key == edit.Row);
         if (column > 0 && row is not null)
             row.Set(column, applied ? edit.Value : table.Cells[row.Index][column], applied);
     }
@@ -267,7 +295,7 @@ public partial class MainWindow : Window
         if (asset.Problem is { } problem)
             return problem;
         if (column <= 0)
-            return "The row key can't be changed.";
+            return row.Added is null ? "The row key can't be changed." : "A new row's key can't be changed. Revert it in the Mod tab and add it again.";
         var name = table.Columns[column];
         if (table.Field(row.Index, name) is not JValue { Type: not JTokenType.Null })
             return $"{name} can't be edited here. Only single values can be: numbers, text, true or false, and choices.";
@@ -293,6 +321,11 @@ public partial class MainWindow : Window
         var text = box.Text.Trim();
         if (text == row.Cells[column])
             return;
+        if (row.Added is { } added)
+        {
+            EditAdded(row, added, target, column, text, box);
+            return;
+        }
 
         // The editor's text is what the binding writes into the row after this, so it's set to the value that should stay.
         var original = table.Cells[row.Index][column];
@@ -318,6 +351,53 @@ public partial class MainWindow : Window
         }
         MarkDirty();
         Status.Text = $"{edit.Field} in row {edit.Row}: {original} -> {text}";
+    }
+
+    // A value of a row the project adds goes into the addition itself, checked against a fresh copy of the row it starts from.
+    void EditAdded(GridRow row, RowAddition added, EditTarget target, int column, string text, TextBox box)
+    {
+        var field = table!.Columns[column];
+        var changed = added with { Fields = new Dictionary<string, string>(added.Fields) { [field] = text } };
+        if (assets[target.File].Check(target, changed) is { } problem)
+        {
+            box.Text = row.Cells[column];
+            Status.Text = problem;
+            MessageBox.Show(this, problem, "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        project.SetRow(changed);
+        row.Added = changed;
+        box.Text = text;
+        row.Set(column, text, true);
+        MarkDirty();
+        Status.Text = $"{field} in new row {added.Key}: {text}";
+    }
+
+    async void NewItemClicked(object sender, RoutedEventArgs e)
+    {
+        if (game is null || source is null || table is null)
+            return;
+        var cell = Grid.CurrentCell.IsValid ? Grid.CurrentCell : Grid.SelectedCells.FirstOrDefault();
+        if (cell.Item is not GridRow { Added: null } selected)
+        {
+            Status.Text = "Select a cell in the item to copy first (one of the game's own, not a new one).";
+            return;
+        }
+        var from = table.Rows[selected.Index];
+        var copying = from.Text.GetValueOrDefault("ItemKey", $"item {from.Key}");
+        var dialog = new NewItemWindow(source.Name, copying, ItemTemplate.NextId(table, project, source.Id)) { Owner = this };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var (current, adding, kind) = (game, project, source.Id);
+        var item = new NewItem(kind, from.Key, dialog.Id, dialog.ItemName, dialog.Description);
+        if (await Run("Adding the item...", () => ItemTemplate.Add(current, settings, adding, sources, item)) is not { } notes)
+            return;
+        MarkDirty();
+        ShowTable();
+        ShowText();
+        Status.Text = $"Added {dialog.ItemName} as {kind} {dialog.Id}. Its new row is highlighted at the bottom of the table.";
+        MessageBox.Show(this, string.Join(Environment.NewLine + Environment.NewLine, notes), "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
     void SearchChanged(object sender, TextChangedEventArgs e) => ShowRows();
@@ -363,6 +443,9 @@ public partial class MainWindow : Window
             var edit = project.FindText(culture, line.Namespace, line.Key);
             return new TextRow(line.Namespace, line.Key, english.Get(line.Namespace, line.Key) ?? "", edit?.Value ?? line.Text, edit is not null);
         }).ToList();
+        // Text the project adds comes first. A language without its own line shows the English, as the game does.
+        textRows.InsertRange(0, project.AddedText.Select(added => new TextRow(added.Namespace, added.Key, added.English,
+            added.Text.GetValueOrDefault(culture, added.English), true, true)));
         ShowTextRows();
     }
 
@@ -399,6 +482,23 @@ public partial class MainWindow : Window
         var text = box.Text;
         if (text == row.Text)
             return;
+        if (row.Added)
+        {
+            try
+            {
+                TextEditing.SetAdded(project, culture, row.Namespace, row.Key, text == row.English && culture != GameText.English ? "" : text);
+            }
+            catch (EditException problem)
+            {
+                box.Text = row.Text;
+                Status.Text = problem.Message;
+                return;
+            }
+            MarkDirty();
+            ShowTextInfo();
+            Status.Text = $"{row.Key}: set in {GameText.Name(culture)} for the text your mod adds.";
+            return;
+        }
         var original = TextEditing.Set(project, texts[culture], culture, row.Namespace, row.Key, text);
         row.Changed = text != original;
         MarkDirty();
@@ -484,12 +584,16 @@ public partial class MainWindow : Window
 
     void ShowEdits()
     {
-        EditList.ItemsSource = project.Edits.Select(e => new ChangeRow("Value", e.Label, e.Original, e.Value, e))
+        EditList.ItemsSource = project.AddedRows.Select(r => new ChangeRow("New row", r.Label, $"copy of {r.From}",
+                string.Join(", ", r.Fields.Select(f => $"{f.Key} {f.Value}")), r))
+            .Concat(project.AddedText.Select(t => new ChangeRow("New text", t.Label, null,
+                t.English + (t.Text.Count > 1 ? $" (+{t.Text.Count - 1} languages)" : ""), t)))
+            .Concat(project.Edits.Select(e => new ChangeRow("Value", e.Label, e.Original, e.Value, e)))
             .Concat(project.TextEdits.Select(e => new ChangeRow("Text", e.Label, e.Original, e.Value, e)))
             .ToList();
         var file = projectPath is null ? "not saved yet" : projectPath;
-        // Text goes in a .pak of its own; value changes need the .utoc and .ucas container too.
-        var builds = project.Edits.Count > 0 ? ".utoc, .ucas and .pak" : ".pak";
+        // Changed text goes in a .pak of its own; values, new rows and new text keys need the .utoc and .ucas container too.
+        var builds = project.Edits.Count + project.AddedRows.Count + project.AddedText.Count > 0 ? ".utoc, .ucas and .pak" : ".pak";
         ModInfo.Text = $"{project.Changes} changes  |  builds as {project.FileName()}{builds}  |  project: {file}";
         Title = $"Cardinal - {project.Name}{(dirty ? " *" : "")}";
     }
@@ -835,8 +939,15 @@ public partial class MainWindow : Window
                 case TextEdit edit:
                     project.RemoveText(edit.Culture, edit.Namespace, edit.Key);
                     break;
+                case RowAddition row:
+                    project.RemoveRow(row.Table, row.Key);
+                    break;
+                case AddedText text:
+                    project.RemoveAddedText(text.Namespace, text.Key);
+                    break;
             }
         MarkDirty();
+        ShowTable();
         ShowText();
         Status.Text = $"Reverted {selected.Count} changes.";
     }

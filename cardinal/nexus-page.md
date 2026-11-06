@@ -1,6 +1,6 @@
 # Description
 
-Do you want to make mods for Echoes of Aincrad, but bounce right off of Unreal's tools? Are you tired of digging through thousands of files in FModel just to find out how much a sword costs? (╯°□°)╯ Do you just want to see how the game is put together? The Cardinal System, or Cardinal for short, is a modding tool for Echoes of Aincrad in the spirit of Skyrim's Creation Kit. Right now it lets you browse the game's data in plain, searchable tables, change the values and text you want, build them into a mod with one button, merge mods that would otherwise fight over the same files, and explore both floors on a map, all from your own copy of the game. ヽ(・∀・)ﾉ
+Do you want to make mods for Echoes of Aincrad, but bounce right off of Unreal's tools? Are you tired of digging through thousands of files in FModel just to find out how much a sword costs? (╯°□°)╯ Do you just want to see how the game is put together? The Cardinal System, or Cardinal for short, is a modding tool for Echoes of Aincrad in the spirit of Skyrim's Creation Kit. Right now it lets you browse the game's data in plain, searchable tables, change the values and text you want, add brand-new items, build them into a mod with one button, merge mods that would otherwise fight over the same files, and explore both floors on a map, all from your own copy of the game. ヽ(・∀・)ﾉ
 
 It's the start of something much bigger. The goal is for anyone to be able to make mods for this game without having to learn Unreal first, and every version from here on brings it a step closer. (ง •̀_•́)ง
 
@@ -10,6 +10,7 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 - **Editing and one-button mod building:** double-click a value in the tables to change it, and build your changes into an installable mod with one button, or drop it straight into your mods folder. (ﾉ´ヮ`)ﾉ*: ･ﾟ
 - **Text editing:** rename items, rewrite descriptions, fix that one line that's always bugged you, in any of the game's 15 languages, with the English right next to it so you never lose your place. (✿◠‿◠)
 - **Translating:** export a whole language to a spreadsheet, translate it, and import it straight back as a mod. Cardinal even points out any lines whose English changed since you exported, so nothing slips through the cracks after an update.
+- **New items:** pick any item, hit **New item from this row**, and you've got a brand-new one that starts as a copy of it, with its own ID, name and description. Tweak its stats right in the table, and translate it on the Text tab if you like (every language shows your English until you do). It keeps the original's icon for now, since new icons need the Unreal kit that's coming later. Getting it into a shop or chest isn't possible yet either, so for now you can make a recipe craft it, or hand it to yourself with a dev mod. ( ´ ▽ ` )ﾉ
 - **Merging:** mods that change the same game file normally just overwrite each other, so only one of them works. Cardinal keeps your mods as lists of changes instead, and can merge as many as you like into one patch where they ALL work. If two mods set the same value, you decide which one wins by putting them in order. This goes double for text mods, since the game keeps each language in a single file, so every text mod in the same language needs merging. ٩(ˊᗜˋ*)و
 - **Conflict checker:** scans every mod you have installed, made with Cardinal or not, and tells you which ones replace the same files and which copy the game will actually load. No more guessing why a mod isn't doing anything!
 - **After game updates:** Cardinal can re-check your mods against the new version of the game and tell you if anything they change has moved or disappeared, then rebuild them fresh.
@@ -48,7 +49,15 @@ Cardinal shows EVERYTHING in the game's data, including enemies, quests and area
 
 # Compatibility
 
-Cardinal never touches your game files or your saves, so it can't conflict with anything. Cardinal Mappings is a tiny UE4SS mod that does nothing at all unless the game has updated, so it should work alongside any other mod. (￣▽￣)
+Cardinal never touches your saves or the game's own files. The only thing it ever writes into your game folder is a mod you built, into `Paks\~mods`, and only when you hit the button. Cardinal Mappings is a tiny UE4SS mod that does nothing at all unless the game has updated, so it should work alongside any other mod. (￣▽￣)
+
+# Antivirus and SmartScreen
+
+Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the source code on GitHub and build it yourself. Please never turn off your security software just to run a mod tool!
+
+SHA-256 of Cardinal.exe: *(filled in with each release)*
+
+Cardinal has no auto-updater, no telemetry and no background connection. It only goes online when you press the Oodle download button, or the first time you build a mod.
 
 # Bugs
 
@@ -63,3 +72,5 @@ If a table looks wrong, the map doesn't line up, or Cardinal won't open your gam
 # License
 
 Cardinal is open source under the MIT license, so take it apart and build on it however you like! ＼(^o^)／
+
+Cardinal is an unofficial fan-made tool. It isn't affiliated with or endorsed by Bandai Namco or the game's developers, and mods made with it are meant for offline play. Please don't use them in the game's online rooms.

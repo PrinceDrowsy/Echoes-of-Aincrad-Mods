@@ -68,6 +68,61 @@ public sealed class Locres
         return true;
     }
 
+    /// <summary>
+    /// Adds a line the language doesn't have yet, or changes it if it does. Source is the text the line translates (the
+    /// string table's English): the engine skips a translation whose stored source hash doesn't match it.
+    /// </summary>
+    public void Add(string ns, string key, string text, string source)
+    {
+        if (Set(ns, key, text))
+            return;
+        var space = namespaces.FirstOrDefault(n => n.Name == ns);
+        if (space is null)
+            namespaces.Add(space = new Namespace(KeyHash(ns), ns, []));
+        var index = strings.IndexOf(text);
+        if (index < 0)
+        {
+            index = strings.Count;
+            strings.Add(text);
+            refs.Add(0);
+        }
+        refs[index]++;
+        var entry = new Entry(KeyHash(key), key, SourceHash(source), index);
+        space.Entries.Add(entry);
+        byKey[(ns, key)] = entry;
+    }
+
+    // Namespaces and keys are hashed as UTF-16 with CityHash64, folded to 32 bits the way the engine's GetTypeHash does.
+    static uint KeyHash(string text)
+    {
+        var hash = CUE4Parse.Utils.CityHash.CityHash64(Encoding.Unicode.GetBytes(text));
+        return (uint)hash + (uint)(hash >> 32) * 23;
+    }
+
+    static readonly uint[] CrcTable = Enumerable.Range(0, 256).Select(i =>
+    {
+        var c = (uint)i;
+        for (var bit = 0; bit < 8; bit++)
+            c = (c & 1) != 0 ? 0xEDB88320 ^ (c >> 1) : c >> 1;
+        return c;
+    }).ToArray();
+
+    // The engine's FCrc::StrCrc32, which feeds every character in as four bytes.
+    static uint SourceHash(string text)
+    {
+        var crc = ~0u;
+        foreach (var c in text)
+        {
+            uint value = c;
+            for (var i = 0; i < 4; i++)
+            {
+                crc = (crc >> 8) ^ CrcTable[(crc ^ value) & 0xFF];
+                value >>= 8;
+            }
+        }
+        return ~crc;
+    }
+
     public static Locres Read(byte[] data)
     {
         using var reader = new BinaryReader(new MemoryStream(data), Encoding.Unicode);

@@ -13,7 +13,7 @@ static class Cli
     const int Ok = 0, Usage = 1, Setup = 2, ReadFailed = 3, WriteFailed = 4, Found = 5;
 
     static readonly string Help = $"""
-        Cardinal {Diagnostics.Version} - reads Echoes of Aincrad's game files and builds data and text mods. Run with no arguments for the window.
+        Cardinal {Diagnostics.Version} - reads Echoes of Aincrad's game files and builds data, text and new-item mods. Run with no arguments for the window.
 
         Commands:
           setup [--paks DIR] [--key HEX] [--usmap FILE] [--oodle FILE] [--download-oodle]
@@ -34,6 +34,11 @@ static class Cli
                 Every line with that key in that language: namespace, key, text.
           text set PROJECT CULTURE NAMESPACE KEY TEXT
                 Changes one line of text in the mod project (made if missing). The game's own text removes the change.
+                For a key the project adds, sets that language's line; empty text makes the language show the English.
+          new item PROJECT --from ROW --name TEXT --description TEXT [--id ID] [--category TABLE]
+                Adds an item that starts as a copy of item ROW, with its own ID (the next free one if left out)
+                and its own English name and description. --category is the item table, such as Items/HealItem,
+                needed when ROW is an ID in more than one of them.
           text export CULTURE --out FILE [--project PROJECT]
                 CSV of every line in that language next to its English, with the project's changes applied.
           text import CULTURE FILE PROJECT
@@ -54,7 +59,7 @@ static class Cli
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        set, text set, text import, check, build and merge always work from the unmodded game.
+        set, text set, text import, new item, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
         3 a game file couldn't be read, 4 writing failed or a build is already installed,
@@ -85,6 +90,7 @@ static class Cli
                 5 when Word(0) == "text" && Word(1) == "import" => WithUnmoddedGame(options, (game, _) => ImportText(game, w[2], w[3], w[4])),
                 2 when Word(0) == "export" && Word(1) == "tables" => WithGame(options, (game, _) => ExportTables(game, options)),
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
+                3 when Word(0) == "new" && Word(1) == "item" => WithUnmoddedGame(options, (game, settings) => NewItem(game, settings, w[2], options)),
                 6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
                 2 when Word(0) == "check" => WithUnmoddedGame(options, (game, settings) => Check(game, settings, w[1])),
                 2 when Word(0) == "build" => WithUnmoddedGame(options, (game, settings) => Build(game, settings, w[1], options)),
@@ -202,6 +208,8 @@ static class Cli
     static int GetText(Game game, string culture, string key)
     {
         var lines = GameText.Load(game, Culture(game, culture)).Lines.Where(l => l.Key == key).ToList();
+        if (lines.Count == 0 && game.SourceText(key) is { } english)
+            return Print($"{Game.TextNamespace}\t{key}\t{english}\t(the string table's English: {culture} has no line of its own, so it shows this)");
         if (lines.Count == 0)
             throw new EditException($"{culture} has no line with the key {key}.");
         return Lines(lines.Select(l => $"{l.Namespace}\t{l.Key}\t{l.Text}"));
@@ -211,6 +219,12 @@ static class Cli
     {
         culture = Culture(game, culture);
         var project = OpenOrNew(projectPath);
+        if (TextEditing.SetAdded(project, culture, ns, key, text))
+        {
+            project.Save(projectPath);
+            Console.WriteLine($"{culture} / {ns} / {key}: set for the text this project adds.");
+            return Ok;
+        }
         var original = TextEditing.Set(project, GameText.Load(game, culture), culture, ns, key, text);
         project.Save(projectPath);
         Console.WriteLine(text == original
@@ -273,6 +287,36 @@ static class Cli
             ? $"{source.Id} / {row} / {field} is back to its original value; change removed."
             : $"{source.Id} / {row} / {field}: {original} -> {value}. {project.Changes} changes in {projectPath}");
         return Ok;
+    }
+
+    static int NewItem(Game game, Settings settings, string projectPath, Options options)
+    {
+        var sources = TableCatalog.Discover(game);
+        var from = options.Required("from");
+        var kinds = ItemTemplate.Kinds(sources);
+        TableSource kind;
+        if (options.Value("category") is { } category)
+            kind = kinds.FirstOrDefault(k => k.Id.Equals(category, StringComparison.OrdinalIgnoreCase))
+                   ?? throw new ArgumentException($"{category} isn't an item kind. Item kinds: {string.Join(", ", kinds.Select(k => k.Id))}");
+        else
+        {
+            var holding = kinds.Where(k => k.Load(game).Rows.Any(r => r.Key == from)).ToList();
+            kind = holding.Count == 1
+                ? holding[0]
+                : throw new ArgumentException(holding.Count == 0
+                    ? $"No item kind has an item {from}."
+                    : $"Item {from} exists in {holding.Count} kinds, so say which with --category: {string.Join(", ", holding.Select(k => k.Id))}");
+        }
+
+        var project = OpenOrNew(projectPath);
+        var id = options.Value("id") is { } text
+            ? int.TryParse(text, out var parsed) ? parsed : throw new ArgumentException("--id needs a whole number.")
+            : ItemTemplate.NextId(kind.Load(game), project, kind.Id);
+        var item = new NewItem(kind.Id, from, id, options.Required("name"), options.Required("description"));
+        var notes = ItemTemplate.Add(game, settings, project, sources, item);
+        project.Save(projectPath);
+        Console.WriteLine($"Added item {id} to {kind.Id} in {projectPath}. Its text keys are in the project; set other languages with text set.");
+        return Lines(notes);
     }
 
     static int Build(Game game, Settings settings, string projectPath, Options options)
@@ -353,7 +397,7 @@ static class Cli
     sealed class Options
     {
         static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds"];
-        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project"];
+        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project", "from", "id", "name", "description", "category"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.
         public List<string> Words { get; } = [];

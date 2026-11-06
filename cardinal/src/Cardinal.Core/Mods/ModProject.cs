@@ -38,13 +38,36 @@ public sealed record TextEdit(string Culture, string Namespace, string Key, stri
 }
 
 /// <summary>
+/// A row the mod adds to a table. It starts as a copy of From, an existing row of the same table, and Fields then
+/// replace single values of the copy by their column's dotted path. Key is the new row's key.
+/// </summary>
+public sealed record RowAddition(string Table, string Key, string From, Dictionary<string, string> Fields)
+{
+    [JsonIgnore]
+    public string Label => $"{Table} / {Key}";
+}
+
+/// <summary>
+/// A line of text the mod adds, for a new key that rows can point at. Text holds the line per language code and must
+/// have English; every language without its own line shows the English, as the game does for its own untranslated lines.
+/// </summary>
+public sealed record AddedText(string Namespace, string Key, Dictionary<string, string> Text)
+{
+    [JsonIgnore]
+    public string Label => $"{Namespace} / {Key}";
+
+    [JsonIgnore]
+    public string English => Text.GetValueOrDefault(Cardinal.Text.GameText.English, "");
+}
+
+/// <summary>
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
-/// Format 2 added text edits; format 1 files load unchanged.
+/// Format 2 added text edits and format 3 added rows and text; older files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
-    public const int CurrentFormat = 2;
+    public const int CurrentFormat = 3;
 
     // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
     // The merged patch takes the top number, so it wins over every mod it was merged from.
@@ -67,10 +90,12 @@ public sealed partial class ModProject
     public int Priority { get; set; } = DefaultPriority;
     public List<ModEdit> Edits { get; set; } = [];
     public List<TextEdit> TextEdits { get; set; } = [];
+    public List<RowAddition> AddedRows { get; set; } = [];
+    public List<AddedText> AddedText { get; set; } = [];
 
-    /// <summary>Value and text edits together.</summary>
+    /// <summary>Every change of every kind.</summary>
     [JsonIgnore]
-    public int Changes => Edits.Count + TextEdits.Count;
+    public int Changes => Edits.Count + TextEdits.Count + AddedRows.Count + AddedText.Count;
 
     public static ModProject Load(string path)
     {
@@ -92,7 +117,7 @@ public sealed partial class ModProject
         return project;
     }
 
-    // A format 1 file saved again becomes format 2, so an older Cardinal refuses it instead of dropping its text edits.
+    // An older file saved again takes the current format, so an older Cardinal refuses it instead of dropping what it can't read.
     public void Save(string path)
     {
         FormatVersion = CurrentFormat;
@@ -130,6 +155,36 @@ public sealed partial class ModProject
 
     public bool RemoveText(string culture, string ns, string key) =>
         FindText(culture, ns, key) is { } edit && TextEdits.Remove(edit);
+
+    public RowAddition? FindRow(string table, string key) =>
+        AddedRows.FirstOrDefault(r => r.Table == table && r.Key == key);
+
+    /// <summary>Adds the row, replacing an earlier addition with the same table and key.</summary>
+    public void SetRow(RowAddition row)
+    {
+        if (FindRow(row.Table, row.Key) is { } old)
+            AddedRows[AddedRows.IndexOf(old)] = row;
+        else
+            AddedRows.Add(row);
+    }
+
+    public bool RemoveRow(string table, string key) =>
+        FindRow(table, key) is { } row && AddedRows.Remove(row);
+
+    public AddedText? FindAddedText(string ns, string key) =>
+        AddedText.FirstOrDefault(t => t.Namespace == ns && t.Key == key);
+
+    /// <summary>Adds the line, replacing an earlier one with the same namespace and key.</summary>
+    public void SetAddedText(AddedText text)
+    {
+        if (FindAddedText(text.Namespace, text.Key) is { } old)
+            AddedText[AddedText.IndexOf(old)] = text;
+        else
+            AddedText.Add(text);
+    }
+
+    public bool RemoveAddedText(string ns, string key) =>
+        FindAddedText(ns, key) is { } text && AddedText.Remove(text);
 
     /// <summary>
     /// The name the built files get: letters, digits, dashes and underscores, then the priority and _P.

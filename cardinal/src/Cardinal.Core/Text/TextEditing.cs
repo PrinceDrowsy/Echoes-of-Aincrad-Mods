@@ -27,6 +27,25 @@ public static class TextEditing
         return original;
     }
 
+    /// <summary>
+    /// Sets one language's line for text the project adds. Empty text in a language other than English removes that
+    /// language's line, so it shows the English again. Returns false when the project doesn't add that key.
+    /// </summary>
+    public static bool SetAdded(ModProject project, string culture, string ns, string key, string text)
+    {
+        if (project.FindAddedText(ns, key) is not { } added)
+            return false;
+        var lines = new Dictionary<string, string>(added.Text);
+        if (culture == GameText.English && string.IsNullOrWhiteSpace(text))
+            throw new EditException("Text the mod adds needs English: every language without its own line shows it.");
+        if (string.IsNullOrWhiteSpace(text))
+            lines.Remove(culture);
+        else
+            lines[culture] = text;
+        project.SetAddedText(added with { Text = lines });
+        return true;
+    }
+
     /// <summary>The line as the project shows it: its edit if it has one, otherwise the unmodded game's text.</summary>
     public static string Current(ModProject project, string culture, TextLine line) =>
         project.FindText(culture, line.Namespace, line.Key)?.Value ?? line.Text;
