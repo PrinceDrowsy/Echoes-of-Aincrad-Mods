@@ -277,7 +277,7 @@ static class Cli
         var table = source.Load(game);
         var index = table.Rows.ToList().FindIndex(r => r.Key == row);
         if (index < 0)
-            throw new EditException($"{source.Id} has no row {row}.");
+            return SetAdded(settings, projectPath, source, target, row, field, value);
 
         var original = table.Field(index, field) is Newtonsoft.Json.Linq.JValue v ? Table.Cell(v) : null;
         var edit = new ModEdit(source.Id, row, field, value, original);
@@ -296,6 +296,19 @@ static class Cli
             ? $"{source.Id} / {row} / {field} is back to its original value; change removed."
             : $"{source.Id} / {row} / {field}: {original} -> {value}. {project.Changes} changes in {projectPath}");
         return Ok;
+    }
+
+    // A value of a row the project adds goes into the addition itself, as in the window.
+    static int SetAdded(Settings settings, string projectPath, TableSource source, EditTarget target, string row, string field, string value)
+    {
+        var project = OpenOrNew(projectPath);
+        var added = project.FindRow(source.Id, row) ?? throw new EditException($"{source.Id} has no row {row}, and the project doesn't add one.");
+        var changed = added with { Fields = new Dictionary<string, string>(added.Fields) { [field] = value } };
+        if (EditableAsset.Load(settings, new Usmap(settings.MappingsFile!), target.File).Check(target, changed) is { } problem)
+            throw new EditException(problem);
+        project.SetRow(changed);
+        project.Save(projectPath);
+        return Print($"{source.Id} / {row} (new row) / {field}: {value}. {project.Changes} changes in {projectPath}");
     }
 
     static int NewItem(Game game, Settings settings, string projectPath, Options options)
