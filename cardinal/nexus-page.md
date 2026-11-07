@@ -1,8 +1,10 @@
+日本語の説明はページの下にあります♪ ↓
+
 # Description
 
 Do you want to make mods for Echoes of Aincrad, but bounce right off of Unreal's tools? Are you tired of digging through thousands of files in FModel just to find out how much a sword costs? (╯°□°)╯ Do you just want to see how the game is put together? The Cardinal System, or Cardinal for short, is a modding tool for Echoes of Aincrad in the spirit of Skyrim's Creation Kit. Right now it lets you browse the game's data in plain, searchable tables, change the values and text you want, add brand-new items, build them into a mod with one button, merge mods that would otherwise fight over the same files, and explore both floors on a map, all from your own copy of the game. ヽ(・∀・)ﾉ
 
-It's the start of something much bigger. The goal is for anyone to be able to make mods for this game without having to learn Unreal first, and every version from here on brings it a step closer. (ง •̀_•́)ง
+The goal is for anyone to be able to make mods for this game without having to learn Unreal first, and every version from here on brings it a step closer. (ง •̀_•́)ง
 
 # Features
 
@@ -78,10 +80,11 @@ If a table looks wrong, the map doesn't line up, or Cardinal won't open your gam
 - [retoc](https://github.com/trumank/retoc) and [repak](https://github.com/trumank/repak) by Truman Kilen and friends, which pack your mods into files the game can load. Both ship with Cardinal, unchanged.
 - Every other library Cardinal uses, and all their licenses, are listed in THIRD_PARTY_NOTICES.md and the licenses folder in the download.
 - [Terrain Inspector](https://www.nexusmods.com/skyrimspecialedition/mods/198117) for Skyrim, which inspired the map viewer.
+- Honestly, just like. The entire Skyrim modding community as a whole.
 - eluwave, for the UE4SS build the whole Echoes of Aincrad modding scene runs on.
 
 # License
 
 Cardinal is open source under the MIT license, so take it apart and build on it however you like! ＼(^o^)／
 
-Cardinal is an unofficial fan-made tool. It isn't affiliated with or endorsed by Bandai Namco or the game's developers, and mods made with it are meant for offline play. Please don't use them in the game's online rooms.
+Cardinal is an unofficial fan-made tool. It isn't affiliated with or endorsed by Bandai Namco or the game's developers, and mods made with it are meant for offline play. Please don't use them in the game's online rooms. Don't ruin the fun for everyone by getting Bandai assassins/lawyers set on my ass or something.
