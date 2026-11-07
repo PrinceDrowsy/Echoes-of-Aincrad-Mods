@@ -1,0 +1,23 @@
+The Cardinal System - a modding tool for Echoes of Aincrad
+
+Hi! (ﾉ´ヮ`)ﾉ*: ･ﾟ
+
+If you're a player who just needs the Patch button:
+  1. Open Cardinal.exe and fill in the setup screen once (it explains how to get the AES key).
+  2. Go to the Installed mods tab and press "Patch new assets".
+  3. Do that again whenever you install or remove a mod that adds new things, like towns.
+That's it, you're done!
+
+If you want to make mods:
+  Everything is explained in README.md, right next to this file. Start with the Tables tab,
+  double-click a value, and have fun. (๑•̀ㅂ•́)و✧
+
+A few things worth knowing:
+  - Run Cardinal from this folder, not from inside the zip.
+  - Cardinal never touches your saves or the game's own files. It only writes mods you build
+    and the registry patch, into Paks\~mods, and only when you press the button.
+  - It isn't signed, so Windows SmartScreen might warn you the first time. The SHA-256 is on
+    the Nexus page if you want to check your download. Please don't turn off your antivirus!
+  - Cardinal shows everything in the game's data, spoilers included. (・_・;)
+
+Bugs, questions, or something cool you made? Come say hi on the Nexus page!

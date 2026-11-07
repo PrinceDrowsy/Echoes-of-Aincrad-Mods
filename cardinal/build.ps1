@@ -49,7 +49,7 @@ function Publish {
     # retoc downloads Oodle beside itself when run; a copy left from testing must never ship.
     Get-ChildItem $out -Filter 'oo2core*.dll' | Remove-Item
     New-Item -ItemType Directory -Force "$out\licenses" | Out-Null
-    Copy-Item "$PSScriptRoot\README.md", "$PSScriptRoot\THIRD_PARTY_NOTICES.md" $out
+    Copy-Item "$PSScriptRoot\README.md", "$PSScriptRoot\Read me.txt", "$PSScriptRoot\THIRD_PARTY_NOTICES.md" $out
     Copy-Item "$PSScriptRoot\licenses\*" "$out\licenses"
     Copy-Item "$tools\dotnet\LICENSE.txt" "$out\licenses\dotnet-LICENSE.txt"
     Copy-Item "$tools\dotnet\ThirdPartyNotices.txt" "$out\licenses\dotnet-ThirdPartyNotices.txt"
@@ -79,6 +79,8 @@ function Release {
     Copy-Item "$PSScriptRoot\..\mods\CardinalMappings" "$stage\CardinalMappings" -Recurse
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
+    # Windows PowerShell's zip writer uses backslashes in entry names by default, which other extractors reject.
+    [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash', $false)
     $files = @("$out\Cardinal.exe")
     foreach ($name in 'Cardinal', 'CardinalMappings') {
         $zip = "$release\$name-$version.zip"
