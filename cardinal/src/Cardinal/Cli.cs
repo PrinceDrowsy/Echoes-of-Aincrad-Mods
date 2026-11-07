@@ -39,6 +39,9 @@ static class Cli
                 Adds an item that starts as a copy of item ROW, with its own ID (the next free one if left out)
                 and its own English name and description. --category is the item table, such as Items/UseItem,
                 needed when ROW is an ID in more than one of them.
+          new town PROJECT --from ROW --name TEXT [--id ID]
+                Adds a town that starts as a copy of DT_TownList row ROW, with its own town ID (the next free one
+                if left out) and English name, and a copy of that town's Town_ asset.
           new asset PROJECT FROM PACKAGE
                 Adds a copy of the game asset FROM as the new asset PACKAGE, both /Game paths, such as
                 /Game/ROD/DataAssets/Town/Town_004 and /Game/ROD/DataAssets/Town/Town_011.
@@ -66,7 +69,7 @@ static class Cli
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        set, text set, text import, new item, new asset, check, build and merge always work from the unmodded game.
+        set, text set, text import, new item, new town, new asset, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
         3 a game file couldn't be read, 4 writing failed or a build is already installed,
@@ -98,6 +101,7 @@ static class Cli
                 2 when Word(0) == "export" && Word(1) == "tables" => WithGame(options, (game, _) => ExportTables(game, options)),
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
                 3 when Word(0) == "new" && Word(1) == "item" => WithUnmoddedGame(options, (game, settings) => NewItem(game, settings, w[2], options)),
+                3 when Word(0) == "new" && Word(1) == "town" => WithUnmoddedGame(options, (game, settings) => NewTown(game, settings, w[2], options)),
                 5 when Word(0) == "new" && Word(1) == "asset" => WithUnmoddedGame(options, (game, _) => NewAsset(game, w[2], w[3], w[4])),
                 1 when Word(0) == "patch" => Guarded(() => Patch(options.Apply(Settings.Load()))),
                 6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
@@ -350,6 +354,20 @@ static class Cli
         Console.WriteLine($"Built {project.Changes} changes into:");
         Lines(files);
         return options.Has("install") && project.AddedAssets.Count > 0 ? Patch(settings) : Ok;
+    }
+
+    static int NewTown(Game game, Settings settings, string projectPath, Options options)
+    {
+        var sources = TableCatalog.Discover(game);
+        var project = OpenOrNew(projectPath);
+        var id = options.Value("id") is { } text
+            ? int.TryParse(text, out var parsed) ? parsed : throw new ArgumentException("--id needs a whole number.")
+            : TownTemplate.NextId(sources.Single(s => s.Id == TownTemplate.Table).Load(game), project);
+        var name = options.Required("name");
+        var notes = TownTemplate.Add(game, settings, project, sources, new NewTown(options.Required("from"), id, name));
+        project.Save(projectPath);
+        Console.WriteLine($"Added the town {name} with ID {id:000} to {projectPath}.");
+        return Lines(notes);
     }
 
     static int NewAsset(Game game, string projectPath, string from, string package)

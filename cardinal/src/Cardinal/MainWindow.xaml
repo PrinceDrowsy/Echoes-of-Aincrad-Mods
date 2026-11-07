@@ -95,6 +95,9 @@
                             <Button x:Name="NewItemButton" DockPanel.Dock="Right" Content="New item from this row..." Margin="4,0,0,0" Padding="8,2"
                                     Click="NewItemClicked" Visibility="Collapsed"
                                     ToolTip="Adds a new item to your mod that starts as a copy of the selected one, with its own ID, name and description." />
+                            <Button x:Name="NewTownButton" DockPanel.Dock="Right" Content="New town from this row..." Margin="4,0,0,0" Padding="8,2"
+                                    Click="NewTownClicked" Visibility="Collapsed"
+                                    ToolTip="Adds a new town to your mod that starts as a copy of the selected one, with its own ID and name in the warp list." />
                             <TextBlock DockPanel.Dock="Left" Text="Search" VerticalAlignment="Center" Margin="0,0,6,0" />
                             <TextBox x:Name="SearchBox" TextChanged="SearchChanged" />
                         </DockPanel>

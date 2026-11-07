@@ -183,6 +183,7 @@ public partial class MainWindow : Window
             Grid.Columns.Add(Column(loaded.Columns[i], i));
         ShowTable();
         NewItemButton.Visibility = ItemTemplate.Kinds([selected]).Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        NewTownButton.Visibility = selected.Id == TownTemplate.Table ? Visibility.Visible : Visibility.Collapsed;
         Status.Text = $"{selected.Group} / {selected.Name}";
         await CheckEditable(selected);
     }
@@ -397,6 +398,33 @@ public partial class MainWindow : Window
         ShowTable();
         ShowText();
         Status.Text = $"Added {dialog.ItemName} as {kind} {dialog.Id}. Its new row is highlighted at the bottom of the table.";
+        MessageBox.Show(this, string.Join(Environment.NewLine + Environment.NewLine, notes), "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    async void NewTownClicked(object sender, RoutedEventArgs e)
+    {
+        if (game is null || table is null)
+            return;
+        var cell = Grid.CurrentCell.IsValid ? Grid.CurrentCell : Grid.SelectedCells.FirstOrDefault();
+        if (cell.Item is not GridRow { Added: null } selected)
+        {
+            Status.Text = "Select a cell in the town to copy first (one of the game's own, not a new one).";
+            return;
+        }
+        var from = table.Rows[selected.Index];
+        var copying = game.Text("AreaTitle_" + from.Fields["Name"]) ?? $"town {from.Fields["ID"]}";
+        var dialog = new NewTownWindow(copying, TownTemplate.NextId(table, project)) { Owner = this };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        var (current, adding) = (game, project);
+        var town = new NewTown(from.Key, dialog.Id, dialog.TownName);
+        if (await Run("Adding the town...", () => TownTemplate.Add(current, settings, adding, sources, town)) is not { } notes)
+            return;
+        MarkDirty();
+        ShowTable();
+        ShowText();
+        Status.Text = $"Added {dialog.TownName} as town {dialog.Id:000}. Its new row is highlighted at the bottom of the table.";
         MessageBox.Show(this, string.Join(Environment.NewLine + Environment.NewLine, notes), "Cardinal", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
