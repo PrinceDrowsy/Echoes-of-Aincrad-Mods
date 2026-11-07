@@ -1,0 +1,94 @@
+[size=5][b]Description[/b][/size]
+
+Do you want to make mods for Echoes of Aincrad, but bounce right off of Unreal's tools? Are you tired of digging through thousands of files in FModel just to find out how much a sword costs? (╯°□°)╯ Do you just want to see how the game is put together? The Cardinal System, or Cardinal for short, is a modding tool for Echoes of Aincrad in the spirit of Skyrim's Creation Kit. Right now it lets you browse the game's data in plain, searchable tables, change the values and text you want, add brand-new items, build them into a mod with one button, merge mods that would otherwise fight over the same files, and explore both floors on a map, all from your own copy of the game. ヽ(・∀・)ﾉ
+
+It's the start of something much bigger. The goal is for anyone to be able to make mods for this game without having to learn Unreal first, and every version from here on brings it a step closer. (ง •̀_•́)ง
+
+[size=5][b]Features[/b][/size]
+
+[list]
+[*][b]Data browser:[/b] items, enemies, skills, quests and every other data table in the game, 218 tables in all, shown as plain tables with English names pulled from the game's own text. Search any of them, and export them to CSV or JSON.
+[*][b]Editing and one-button mod building:[/b] double-click a value in the tables to change it, and build your changes into an installable mod with one button, or drop it straight into your mods folder. (ﾉ´ヮ`)ﾉ*: ･ﾟ
+[*][b]Text editing:[/b] rename items, rewrite descriptions, fix that one line that's always bugged you, in any of the game's 15 languages, with the English right next to it so you never lose your place. (✿◠‿◠)
+[*][b]Translating:[/b] export a whole language to a spreadsheet, translate it, and import it straight back as a mod. Cardinal even points out any lines whose English changed since you exported, so nothing slips through the cracks after an update.
+[*][b]New items:[/b] pick an item in one of the item tables, hit [b]New item from this row[/b], and you've got a brand-new one that starts as a copy of it, with its own ID, name and description. Tweak its stats right in the table, and translate it on the Text tab if you like (every language shows your English until you do). It keeps the original's icon for now, since new icons need the Unreal kit that's coming later. Getting it into a shop or chest isn't possible yet either, so for now you can make a recipe craft it, or hand it to yourself with a dev mod. ( ´ ▽ ` )ﾉ New items are tested in the game, and so is taking them back out: remove the mod and your save still loads, the game just quietly drops the item. (The heal crystals, Col, spheres and skill points aren't offered, since those are pickups you use on the spot, so a copy could never end up in your inventory.)
+[*][b]New assets, like towns:[/b] add a copy of a game asset under its own name, and the game treats it as brand new. A copy of a town plus a new row in the town list gives you a new entry in the warp menu, and yes, we've warped there! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ It shares the original town's map for now, since new maps need the Unreal kit. This one's command line only at the moment; a [b]New town[/b] button is coming.
+[*][b]Merging:[/b] mods that change the same game file normally just overwrite each other, so only one of them works. Cardinal keeps your mods as lists of changes instead, and can merge as many as you like into one patch where they ALL work. If two mods set the same value, you decide which one wins by putting them in order. This goes double for text mods, since the game keeps each language in a single file, so every text mod in the same language needs merging. ٩(ˊᗜˋ*)و
+[*][b]Conflict checker:[/b] scans every mod you have installed, made with Cardinal or not, and tells you which ones replace the same files and which copy the game will actually load. No more guessing why a mod isn't doing anything!
+[*][b]After game updates:[/b] Cardinal can re-check your mods against the new version of the game and tell you if anything they change has moved or disappeared, then rebuild them fresh.
+[*][b]Map viewer:[/b] both floors, drawn from the game's own map data, with every region in its own color. Zoom, pan, and hover over any spot to see what's there. You can also light up every part of the map your installed mods replace, colored by which mod wins there.
+[*][b]Developer layers:[/b] the game shipped with some of its level designers' planning notes still inside it, like how big each kind of fight is meant to be, where chests go, where the barriers sit, and the color legend for their rough layouts. Tick them on and off in a checklist to see how the floors were planned. (・∀・)
+[*][b]Command line:[/b] every export also works without the window, so scripts can pull the game's data straight into your own projects. The file formats are documented in the README.
+[*][b]Your game, your files:[/b] Cardinal reads everything from your own copy of the game. It never ships any of the game's files or its encryption key.
+[/list]
+
+[size=5][b]For players: the Patch button[/b][/size]
+
+Mods that add brand-new things, like towns or quests, need the game's asset registry to know about them, and only one mod can replace that file. So if you use any mods made with Cardinal that add new things, open Cardinal after installing or removing them and press [b]Patch new assets[/b] on the Installed mods tab. It takes a moment, and it puts every mod's new stuff into one patch so they all work together instead of hiding each other. That's the only thing you ever need Cardinal for as a player! (๑•̀ㅂ•́)و✧ Mod managers can run it for you too, with Cardinal.exe patch.
+
+And hey, while you're in there, poke around the tables for a bit. That's how a lot of modders got started. (*´꒳`*)
+
+[size=5][b]Planned Features[/b][/size]
+
+[list]
+[*]A [b]New town[/b] button, so you don't need the command line for new towns.
+[*]Outfit fitting for body replacers, in the spirit of BodySlide and Outfit Studio.
+[*]A quest and dialogue editor.
+[*]A location editor for building new places out of the game's own assets.
+[*]A VRoid and VRM pipeline, so you can bring your own hair, outfits and accessories into the game.
+[/list]
+
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*]Windows, 64-bit.
+[*]Echoes of Aincrad.
+[*]The game's AES key. Cardinal can't include it (´・ω・`), so you'll need to get it from your own copy with [url=https://github.com/GHFear/AESDumpster/releases]AESDumpster[/url]. Cardinal explains how on its setup screen.
+[*][b]Optional:[/b] [url=https://www.nexusmods.com/echoesofaincrad/mods/7]UE4SS[/url], for the Cardinal Mappings companion mod.
+[/list]
+
+[size=5][b]Installation[/b][/size]
+
+[list=1]
+[*]Download the main file and extract the whole folder wherever you like. Don't run it from inside the zip.
+[*]Download Cardinal Mappings from the optional files, and put the CardinalMappings folder in EchoesofAincrad/Binaries/Win64/ue4ss/Mods/.
+[*]Start the game and wait at the title screen for about 15 seconds. That's when Cardinal Mappings writes the file Cardinal needs to read the game's data. It writes a fresh one by itself after every game update, so you only have to do this once. ( ˘ω˘ )
+[*]Open Cardinal.exe and fill in the setup screen. It finds your game by itself, so all you need to do is paste in your AES key and hit the Oodle download button (or pick your own Oodle DLL, if you have one).
+[*]Done! Go nuts poking around Aincrad's insides. (ﾉ´ヮ`)ﾉ*: ･ﾟ
+[/list]
+
+If you'd rather not use Cardinal Mappings, you can make the mappings file yourself with UE4SS's DumpUSMAP() and pick it on the setup screen instead.
+
+[size=5][b]Spoilers[/b][/size]
+
+Cardinal shows EVERYTHING in the game's data, including enemies, quests and areas you might not have reached yet. If you're still on your first playthrough, keep that in mind before you go browsing. (・_・;)
+
+[size=5][b]Compatibility[/b][/size]
+
+Cardinal never touches your saves or the game's own files. The only things it ever writes into your game folder are mods you built and the registry patch, both into Paks\~mods, and only when you hit the button. Cardinal Mappings is a tiny UE4SS mod that does nothing at all unless the game has updated, so it should work alongside any other mod. (￣▽￣)
+
+[size=5][b]Antivirus and SmartScreen[/b][/size]
+
+Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the source code on GitHub and build it yourself. Please never turn off your security software just to run a mod tool!
+
+SHA-256 of Cardinal.exe: [i](filled in with each release)[/i]
+
+Cardinal has no auto-updater, no telemetry and no background connection. It only goes online when you press the Oodle download button, or the first time you build a mod.
+
+[size=5][b]Bugs[/b][/size]
+
+If a table looks wrong, the map doesn't line up, or Cardinal won't open your game, please let me know through the bug reports tab of this mod page. Screenshots help a ton, and so does the [b]Copy diagnostic info[/b] button at the bottom of Cardinal's window. It copies your Cardinal and game versions and which mods you have installed, and never your key or anything about your PC. m(_ _)m
+
+[size=5][b]Credits[/b][/size]
+
+[list]
+[*][url=https://github.com/FabianFG/CUE4Parse]CUE4Parse[/url], the library FModel is built on, which does the heavy lifting of reading the game's files. Its license is included with Cardinal.
+[*][url=https://www.nexusmods.com/skyrimspecialedition/mods/198117]Terrain Inspector[/url] for Skyrim, which inspired the map viewer.
+[*]eluwave, for the UE4SS build the whole Echoes of Aincrad modding scene runs on.
+[/list]
+
+[size=5][b]License[/b][/size]
+
+Cardinal is open source under the MIT license, so take it apart and build on it however you like! ＼(^o^)／
+
+Cardinal is an unofficial fan-made tool. It isn't affiliated with or endorsed by Bandai Namco or the game's developers, and mods made with it are meant for offline play. Please don't use them in the game's online rooms.
