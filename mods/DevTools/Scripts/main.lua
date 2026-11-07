@@ -124,6 +124,9 @@ local EXP = 5000
 local GIVE_ITEM = { Category = 1, ItemId = 1, Num = 5 }
 -- A playable quest is always a QST_Free_ number: 1NNNN for main quests, 2NNNN for side quests.
 local GIVE_QUEST = 20001
+-- A side story from DA_SubStoryManage and the step to set it to. Its giver's conversation sets 2022 to 2000 when it
+-- hands out quest 20050.
+local SET_SIDE_STORY = { ID = "2022", Progress = 2000 }
 -- A MainStory_ step. Town warping opens at 29000, but a step's opening event can lock the gate until it ends
 -- (TargetDenyGimmicks). 33000 is the first step after that with no lock and no main quest running.
 local SET_STORY = 33000
@@ -177,6 +180,11 @@ cheat(Key.SIX, "set story progress " .. SET_STORY, function()
     log("story progress was " .. game.MainStoryProgress)
     FindFirstOf("RODInGamePlayerController"):ServerDebugSetMainStoryProgress(SET_STORY)
     log("story progress is " .. game.MainStoryProgress)
+end)
+
+-- What a giver's conversation does besides handing out the quest. Throwaway saves only, like the story jump.
+cheat(Key.EIGHT, "set side story " .. SET_SIDE_STORY.ID .. " to " .. SET_SIDE_STORY.Progress, function()
+    FindFirstOf("RODInGamePlayerController"):ServerDebugSetSubStoryProgress(FName(SET_SIDE_STORY.ID), SET_SIDE_STORY.Progress)
 end)
 
 -- Dyeing unlocks through a side story step (RODGameConfig.ReleaseEquipmentColorChange). This sets the same release
