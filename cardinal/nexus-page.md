@@ -61,7 +61,7 @@ Cardinal never touches your saves or the game's own files. The only things it ev
 
 # Antivirus and SmartScreen
 
-Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the source code on GitHub and build it yourself. Please never turn off your security software just to run a mod tool!
+Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the [source code on GitHub](https://github.com/PrinceDrowsy/Echoes-of-Aincrad-Mods) and build it yourself. Please never turn off your security software just to run a mod tool!
 
 SHA-256 of Cardinal.exe (0.5.0): C62428FCA1AA78BF2261BF5C05F5E79AC977C3AC559D822DF8A174BA238476A9
 
@@ -74,6 +74,9 @@ If a table looks wrong, the map doesn't line up, or Cardinal won't open your gam
 # Credits
 
 - [CUE4Parse](https://github.com/FabianFG/CUE4Parse), the library FModel is built on, which does the heavy lifting of reading the game's files. Its license is included with Cardinal.
+- [UAssetAPI](https://github.com/atenfyr/UAssetAPI) by atenfyr, which Cardinal uses to edit game assets for your mods.
+- [retoc](https://github.com/trumank/retoc) and [repak](https://github.com/trumank/repak) by Truman Kilen and friends, which pack your mods into files the game can load. Both ship with Cardinal, unchanged.
+- Every other library Cardinal uses, and all their licenses, are listed in THIRD_PARTY_NOTICES.md and the licenses folder in the download.
 - [Terrain Inspector](https://www.nexusmods.com/skyrimspecialedition/mods/198117) for Skyrim, which inspired the map viewer.
 - eluwave, for the UE4SS build the whole Echoes of Aincrad modding scene runs on.
 
