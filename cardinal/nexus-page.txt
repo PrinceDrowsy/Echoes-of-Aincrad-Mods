@@ -14,7 +14,7 @@ The goal is for anyone to be able to make mods for this game without having to l
 [*][b]Text editing:[/b] rename items, rewrite descriptions, fix that one line that's always bugged you, in any of the game's 15 languages, with the English right next to it so you never lose your place. (✿◠‿◠)
 [*][b]Translating:[/b] export a whole language to a spreadsheet, translate it, and import it straight back as a mod. Cardinal even points out any lines whose English changed since you exported, so nothing slips through the cracks after an update.
 [*][b]New items:[/b] pick an item in one of the item tables, hit [b]New item from this row[/b], and you've got a brand-new one that starts as a copy of it, with its own ID, name and description. Tweak its stats right in the table, and translate it on the Text tab if you like (every language shows your English until you do). It keeps the original's icon for now, since new icons need the Unreal kit that's coming later. Getting it into a shop or chest isn't possible yet either, so for now you can make a recipe craft it, or hand it to yourself with a dev mod. ( ´ ▽ ` )ﾉ New items are tested in the game, and so is taking them back out: remove the mod and your save still loads, the game just quietly drops the item. (The heal crystals, Col, spheres and skill points aren't offered, since those are pickups you use on the spot, so a copy could never end up in your inventory.)
-[*][b]New assets, like towns:[/b] add a copy of a game asset under its own name, and the game treats it as brand new. A copy of a town plus a new row in the town list gives you a new entry in the warp menu, and yes, we've warped there! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ It shares the original town's map for now, since new maps need the Unreal kit. This one's command line only at the moment; a [b]New town[/b] button is coming.
+[*][b]New assets, like towns:[/b] add a copy of a game asset under its own name, and the game treats it as brand new. A copy of a town plus a new row in the town list gives you a new entry in the warp menu, and yes, we've warped there! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ For towns there's a [b]New town from this row[/b] button: pick a town in the town list, give the new one an ID and a name, and it shows up in the warp menu under that name. It shares the original town's map for now, since new maps need the Unreal kit.
 [*][b]Merging:[/b] mods that change the same game file normally just overwrite each other, so only one of them works. Cardinal keeps your mods as lists of changes instead, and can merge as many as you like into one patch where they ALL work. If two mods set the same value, you decide which one wins by putting them in order. This goes double for text mods, since the game keeps each language in a single file, so every text mod in the same language needs merging. ٩(ˊᗜˋ*)و
 [*][b]Conflict checker:[/b] scans every mod you have installed, made with Cardinal or not, and tells you which ones replace the same files and which copy the game will actually load. No more guessing why a mod isn't doing anything!
 [*][b]After game updates:[/b] Cardinal can re-check your mods against the new version of the game and tell you if anything they change has moved or disappeared, then rebuild them fresh.
@@ -33,7 +33,6 @@ And hey, while you're in there, poke around the tables for a bit. That's how a l
 [size=5][b]Planned Features[/b][/size]
 
 [list]
-[*]A [b]New town[/b] button, so you don't need the command line for new towns.
 [*]Outfit fitting for body replacers, in the spirit of BodySlide and Outfit Studio.
 [*]A quest and dialogue editor.
 [*]A location editor for building new places out of the game's own assets.
@@ -73,7 +72,7 @@ Cardinal never touches your saves or the game's own files. The only things it ev
 
 Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the [url=https://github.com/PrinceDrowsy/Echoes-of-Aincrad-Mods]source code on GitHub[/url] and build it yourself. Please never turn off your security software just to run a mod tool!
 
-SHA-256 of Cardinal.exe (0.5.0): C62428FCA1AA78BF2261BF5C05F5E79AC977C3AC559D822DF8A174BA238476A9
+SHA-256 of Cardinal.exe (0.5.1): 266855D248D6400A2E788A547D649CF7787A8F7FC10A2F63404DAD39004A66C2
 
 Cardinal has no auto-updater, no telemetry and no background connection. It only goes online when you press the Oodle download button, or the first time you build a mod.
 
