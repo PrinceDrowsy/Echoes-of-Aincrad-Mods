@@ -17,6 +17,8 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(AddedText text, string problem) : this($"new text {text.Label}", problem, true) { }
 
+    public EditProblem(AssetCopy copy, string problem) : this($"new asset {copy.Label}", problem, true) { }
+
     public override string ToString() => $"{Change}: {Problem}";
 }
 
@@ -25,8 +27,8 @@ public static class ModBuilder
 {
     /// <summary>
     /// Applies every change to freshly extracted, unmodded files and packs them as project.FileName() in output:
-    /// value changes into a .utoc and .ucas container, text into the .pak beside it. A text-only mod is just the .pak.
-    /// Every change is checked first, so a project with a bad one builds nothing.
+    /// value changes and copied assets into a .utoc and .ucas container, text and the list of copies into the .pak
+    /// beside it. A text-only mod is just the .pak. Every change is checked first, so a project with a bad one builds nothing.
     /// </summary>
     public static IReadOnlyList<string> Build(Game game, Settings settings, ModProject project, string output)
     {
@@ -49,24 +51,29 @@ public static class ModBuilder
         try
         {
             var files = new List<string>();
-            if (plan.Assets.Count > 0)
+            if (plan.Assets.Count + project.AddedAssets.Count > 0)
             {
                 var assets = Path.Combine(stage, "assets");
                 plan.Steps.ForEach(step => step());
                 foreach (var asset in plan.Assets)
                     asset.Write(Path.Combine(assets, asset.File));
+                if (project.AddedAssets.Count > 0)
+                {
+                    var mappings = new Usmap(settings.MappingsFile!);
+                    foreach (var copy in project.AddedAssets)
+                        AssetCopier.Write(settings, mappings, copy, assets);
+                }
                 files.AddRange(Retoc.Pack(assets, output, project.FileName()));
             }
-            if (text.Count > 0)
+
+            var loose = Path.Combine(stage, "pak");
+            foreach (var (culture, file) in text)
+                Write(Path.Combine(loose, GameText.FilePath(culture)), file.Write());
+            if (project.AddedAssets.Count > 0)
+                Write(Path.Combine(loose, RegistryPatch.ListPath(project)), RegistryPatch.List(project.AddedAssets));
+            if (Directory.Exists(loose))
             {
-                var locres = Path.Combine(stage, "text");
-                foreach (var (culture, file) in text)
-                {
-                    var path = Path.Combine(locres, GameText.FilePath(culture));
-                    Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                    File.WriteAllBytes(path, file.Write());
-                }
-                var pak = Repak.Pack(locres, output, project.FileName());
+                var pak = Repak.Pack(loose, output, project.FileName());
                 if (!files.Contains(pak))
                     files.Add(pak);
             }
@@ -118,6 +125,13 @@ public static class ModBuilder
     {
         var problems = new List<EditProblem>();
         var plan = new AssetPlan([], []);
+        if (project.AddedAssets.Count > 0)
+        {
+            var registry = AssetRegistry.Read(game.Provider.SaveAsset(AssetRegistry.File));
+            foreach (var copy in project.AddedAssets)
+                if (AssetCopier.Check(game, registry, copy) is { } problem)
+                    problems.Add(new EditProblem(copy, problem));
+        }
         if (project.Edits.Count + project.AddedRows.Count + project.AddedText.Count == 0)
             return (plan, problems);
 
@@ -228,6 +242,12 @@ public static class ModBuilder
     }
 
     static string? Original(Locres file, TextEdit edit) => file.Get(edit.Namespace, edit.Key);
+
+    static void Write(string path, byte[] bytes)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllBytes(path, bytes);
+    }
 
     static readonly string[] Extensions = [".utoc", ".ucas", ".pak"];
 

@@ -6,6 +6,7 @@ A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Ve
 - **Text:** read and change the game's text in all of its languages, next to the English, and export a language to CSV for translating and import it back.
 - **Editing and mod building:** change values right in the tables and lines in the Text tab, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
 - **New items:** add an item that starts as a copy of an existing one, with its own ID, name and description in any language.
+- **New assets:** add a copy of a game asset, such as a town, under its own name, and keep every installed mod's new assets findable by the game with one registry patch.
 - **Merging and conflicts:** combine several mods into one merged patch so they all work, and see which installed mods, made with Cardinal or not, replace the same game files and which copy the game loads.
 - **Map:** see each floor from above, cell by cell, colored by region, plus the HLOD grids the game draws in the distance. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details, and switch on the cells installed mods replace.
 - **Command line:** everything the window does, scriptable, for batch work and AI assistants.
@@ -38,15 +39,28 @@ The game keeps each language's text in one file, `Localization/Game/<language>/G
 
 ## Adding items
 
-Select an item in one of the Items tables that end in `Item`, such as **HealItem**, and press **New item from this row**. Give it an ID (the next free one is filled in), an English name and a description. The new item:
+Select an item in one of the Items tables that end in `Item`, such as **UseItem** (potions and other consumables), and press **New item from this row**. The heal, Col, sphere and skill point tables aren't offered: each holds one field pickup that's used on the spot, so a copy could never be held. Give it an ID (the next free one is filled in), an English name and a description. The new item:
 
 - is a copy of the selected one, so it has the same icon, rarity, prices and effects until you change them. Its row shows up highlighted at the bottom of the table, and you can change its values there like any other. A new icon needs The Seed, Cardinal's Unreal kit, which isn't out yet.
-- gets new text keys for its name and description in the game's main string table, named like the game's own (`ItemName_Heal_<ID>`). Every language shows the English until you give it its own: new lines are listed first on the Text tab.
+- gets new text keys for its name and description in the game's main string table, named like the game's own (`ItemName_Usable_<ID>`). Every language shows the English until you give it its own: new lines are listed first on the Text tab.
 - for weapons, shields and gear, also gets copies of the source's rows in the tables that hold menu pictures by ID (such as `DT_OneHandedSwordThumbnail`). Whether the game finds a 3D model for a new ID hasn't been tested.
 
 Cardinal can't put it in a shop, chest or drop list yet: the shop list can't be written back with current mappings, and drop and chest lists are lists, which Cardinal can't edit yet. To get it in game, point an existing recipe's result at it (`ItemData.ItemId` in a recipe table) or give it to yourself with a dev mod. It also isn't added to the in-game database (`DT_ItemDatabase`).
 
 A new item changes the item asset and the main string table, so two mods that add items always replace each other's copies of those files. Merge them to keep both. Two mods adding the same ID to the same table clash, and the later one in the merge wins.
+
+## New assets and the registry patch
+
+A mod can add a copy of a game asset under a new name, such as a town: `new asset` on the command line adds `/Game/ROD/DataAssets/Town/Town_004` as `/Game/ROD/DataAssets/Town/Town_011`. The copy starts with every value of the original. Together with a new `DT_TownList` row whose `ID` is `011`, that's a new town in the warp list, sharing Urbas's map.
+
+The game only finds towns, quests and other primary assets through its asset registry, `AssetRegistry.bin`, and a mod can only replace that file whole. So instead of carrying a registry, a mod built with new assets carries a short list of them in its `.pak`, and **Patch new assets** on the Installed mods tab (or `Cardinal.exe patch`) builds one `CardinalRegistry_9999_P.pak` from every installed mod's list. It starts from the registry the game would load without it, so mods that ship their own registry keep working too.
+
+- Installing a mod with new assets from Cardinal updates the patch by itself.
+- After installing or removing such mods any other way, press **Patch new assets** again. With none left, it removes the patch.
+- Without the patch, the game can't find a new town at all: warping there leaves the screen black.
+- Players who use mods with new assets need Cardinal for this one button, and nothing else.
+
+Removing a mod that added a town, quest or item leaves saves that still load: the game drops what it can't find.
 
 ## Mods that change the same files
 
@@ -91,6 +105,8 @@ Cardinal.exe build PROJECT.json --install [--force]
 Cardinal.exe check PROJECT.json
 Cardinal.exe merge A.json B.json [C.json...] --out DIR
 Cardinal.exe merge A.json B.json [C.json...] --install [--force] [--remove-single-builds]
+Cardinal.exe new asset PROJECT.json FROM PACKAGE
+Cardinal.exe patch
 Cardinal.exe conflicts
 Cardinal.exe diagnostics
 Cardinal.exe help
@@ -106,7 +122,8 @@ Cardinal.exe help
 - `merge` prints every value and line of text more than one project sets and which wins, then builds `CardinalMerged_9999_P`. `--remove-single-builds` deletes the merged projects' own builds from `~mods`.
 - `conflicts` prints a `mod` line per installed mod and a `conflict` line per game file, tab-separated, with what the game loads.
 - `diagnostics` prints the same report as the window's **Copy diagnostic info**.
-- `new item` adds an item to the project; see [Adding items](#adding-items). `--category` is the item table, such as `Items/HealItem`, and is needed when `ROW` is an ID in more than one. Without `--id` it takes the next free ID. For text the project adds, `text set` sets one language's line, and empty text makes that language show the English again.
+- `new asset` adds a copy of the game asset `FROM` as `PACKAGE`, both `/Game` paths; see [New assets and the registry patch](#new-assets-and-the-registry-patch). `patch` rebuilds the registry patch from every installed mod and lists each new asset; problems exit with 5.
+- `new item` adds an item to the project; see [Adding items](#adding-items). `--category` is the item table, such as `Items/UseItem`, and is needed when `ROW` is an ID in more than one. Without `--id` it takes the next free ID. For text the project adds, `text set` sets one language's line, and empty text makes that language show the English again.
 - `set`, `text set`, `text import`, `new item`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
 
 Output goes to stdout, errors to stderr. Exit codes:
@@ -118,19 +135,20 @@ Output goes to stdout, errors to stderr. Exit codes:
 | 2 | Setup missing or wrong (paks, key, mappings, Oodle, retoc, repak), or the files didn't open with that key |
 | 3 | Something couldn't be found or read in the game files. `export tables` still writes the rest and lists failures in `tables.json` |
 | 4 | Writing the output failed, or `--install` found an earlier build without `--force` |
-| 5 | `check`, `conflicts` or `text import` found something to look at |
+| 5 | `check`, `conflicts`, `patch` or `text import` found something to look at |
 
 ## Mod projects
 
-A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 3. Version 2 added `textEdits` and version 3 `addedRows` and `addedText`. Older files open unchanged, and are saved as version 3.
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 4. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, and version 4 `addedAssets`. Older files open unchanged, and are saved as version 4.
 
 ```json
-{ "formatVersion": 3, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
+{ "formatVersion": 4, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
   "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ],
   "textEdits": [ { "culture": "en", "namespace": "ST_DatabaseLocalizeList", "key": "...", "value": "New text", "original": "Old text" } ],
-  "addedRows": [ { "table": "Items/HealItem", "key": "2", "from": "1",
-                   "fields": { "ID": "2", "ItemKey": "ItemName_Heal_2", "DescriptionKey": "ItemDescription_Heal_2" } } ],
-  "addedText": [ { "namespace": "ST_GeneralLocalizeList", "key": "ItemName_Heal_2", "text": { "en": "My Item", "ja-JP": "..." } } ] }
+  "addedRows": [ { "table": "Items/UseItem", "key": "75", "from": "1",
+                   "fields": { "ID": "75", "ItemKey": "ItemName_Usable_75", "DescriptionKey": "ItemDescription_Usable_75" } } ],
+  "addedText": [ { "namespace": "ST_GeneralLocalizeList", "key": "ItemName_Usable_75", "text": { "en": "My Item", "ja-JP": "..." } } ],
+  "addedAssets": [ { "from": "/Game/ROD/DataAssets/Town/Town_004", "package": "/Game/ROD/DataAssets/Town/Town_011" } ] }
 ```
 
 - `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
@@ -138,6 +156,7 @@ A project is a small JSON file holding only the changes. Field names are stable 
 - `original`: the unmodded value when the change was made, for reference. Builds don't need it.
 - `textEdits`: `culture` is a code from `list cultures`, `namespace` and `key` identify the line, `value` is the new text and `original` the game's text when the change was made.
 - `addedRows`: a new row in `table` with the key `key`. It starts as a copy of the game's row `from` in the same table, and `fields` replaces single values of the copy by column name. A field the copied row leaves at its default can't be set yet. Rows are added before `edits` apply, so the copy is always of the game's own row.
+- `addedAssets`: a copy of the game asset `from` as the new asset `package`, both `/Game` paths. The last part of `package` is the copy's name: letters, digits and underscores.
 - `addedText`: a new key in `namespace`, which must be `ST_GeneralLocalizeList`, the game's main string table. `text` holds a line per culture and must have `en`, which goes in the string table itself: every language without its own line shows it, as the game does for its own untranslated lines.
 - `priority`: 1 to 9998, default 1000 when missing. The built files are named after `name` (letters, digits, dashes and underscores) plus `_<priority>_P`, so `FasterRecovery_1000_P`. Any priority makes the mod outrank the game's own patch; see [Mods that change the same files](#mods-that-change-the-same-files).
 

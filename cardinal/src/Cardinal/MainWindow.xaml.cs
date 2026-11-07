@@ -593,7 +593,7 @@ public partial class MainWindow : Window
             .ToList();
         var file = projectPath is null ? "not saved yet" : projectPath;
         // Changed text goes in a .pak of its own; values, new rows and new text keys need the .utoc and .ucas container too.
-        var builds = project.Edits.Count + project.AddedRows.Count + project.AddedText.Count > 0 ? ".utoc, .ucas and .pak" : ".pak";
+        var builds = project.HasContainer ? ".utoc, .ucas and .pak" : ".pak";
         ModInfo.Text = $"{project.Changes} changes  |  builds as {project.FileName()}{builds}  |  project: {file}";
         Title = $"Cardinal - {project.Name}{(dirty ? " *" : "")}";
     }
@@ -762,7 +762,29 @@ public partial class MainWindow : Window
             singles.ForEach(File.Delete);
             Status.Text += $" Removed {singles.Count} files the merged patch replaces.";
         }
+        if (merge.Merged.AddedAssets.Count > 0)
+            await Patch(Status.Text);
         await InstalledChanged();
+    }
+
+    async void PatchRegistry(object sender, RoutedEventArgs e)
+    {
+        await Patch(null);
+        await InstalledChanged();
+    }
+
+    // Rebuilds the registry patch from what's installed now. before is the status it follows, such as an install's.
+    async Task Patch(string? before)
+    {
+        if (await Run("Patching the asset registry...", () => RegistryPatch.Build(settings)) is not { } result)
+            return;
+        var done = result.Pak is null
+            ? "No installed mod adds new assets, so no registry patch is needed."
+            : $"Registry patch updated with {result.Added.Count} new assets.";
+        Status.Text = before is null ? done : $"{before} {done}";
+        if (result.Problems.Count > 0)
+            MessageBox.Show(this, "These new assets couldn't be added, so the game won't find them:" + Environment.NewLine +
+                string.Join(Environment.NewLine, result.Problems), "Cardinal", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     bool ReplaceOk(ModProject building) =>
@@ -982,6 +1004,8 @@ public partial class MainWindow : Window
         if (await Run("Building and installing the mod...", () => ModBuilder.Install(current, settings, building, true)) is not { } files)
             return;
         Status.Text = $"Installed {string.Join(", ", files.Select(Path.GetFileName))}. Start the game to try it.";
+        if (building.AddedAssets.Count > 0)
+            await Patch(Status.Text);
         await InstalledChanged();
     }
 

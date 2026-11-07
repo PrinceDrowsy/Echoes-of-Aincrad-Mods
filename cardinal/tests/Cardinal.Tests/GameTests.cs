@@ -9,7 +9,7 @@ namespace Cardinal.Tests;
 [Collection("Game")]
 public class GameTests(GameFixture fixture)
 {
-    internal const string ActiveSkills = "Skills/DT_ActiveSkillList", HealItems = "Items/HealItem";
+    internal const string ActiveSkills = "Skills/DT_ActiveSkillList", HealItems = "Items/HealItem", UseItems = "Items/UseItem";
 
     internal static string? Value(Game game, string table, string row, string field)
     {

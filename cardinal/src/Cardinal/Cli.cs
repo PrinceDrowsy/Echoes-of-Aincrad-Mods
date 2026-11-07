@@ -37,8 +37,11 @@ static class Cli
                 For a key the project adds, sets that language's line; empty text makes the language show the English.
           new item PROJECT --from ROW --name TEXT --description TEXT [--id ID] [--category TABLE]
                 Adds an item that starts as a copy of item ROW, with its own ID (the next free one if left out)
-                and its own English name and description. --category is the item table, such as Items/HealItem,
+                and its own English name and description. --category is the item table, such as Items/UseItem,
                 needed when ROW is an ID in more than one of them.
+          new asset PROJECT FROM PACKAGE
+                Adds a copy of the game asset FROM as the new asset PACKAGE, both /Game paths, such as
+                /Game/ROD/DataAssets/Town/Town_004 and /Game/ROD/DataAssets/Town/Town_011.
           text export CULTURE --out FILE [--project PROJECT]
                 CSV of every line in that language next to its English, with the project's changes applied.
           text import CULTURE FILE PROJECT
@@ -50,20 +53,24 @@ static class Cli
           build PROJECT --install [--force]
                 Builds the project into NAME_PRIORITY_P.utoc and .ucas for value changes and NAME_PRIORITY_P.pak,
                 which holds changed text, in DIR or straight into Paks\~mods. --force replaces an earlier build there.
+                Installing a project with new assets also updates the registry patch.
           merge PROJECT PROJECT... --out DIR
           merge PROJECT PROJECT... --install [--force] [--remove-single-builds]
                 Combines the projects into one {ModMerge.Name}_{ModProject.MergedPriority}_P patch. Where two change the
                 value or line of text, the one listed later wins. --remove-single-builds deletes their own builds from ~mods.
           conflicts
                 Lists files that more than one installed mod replaces, and which copy the game loads.
+          patch
+                Rebuilds {RegistryPatch.FileName}.pak from every installed mod's new assets, so the game finds all
+                of them. Run it after installing or removing mods that add assets.
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        set, text set, text import, new item, check, build and merge always work from the unmodded game.
+        set, text set, text import, new item, new asset, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
         3 a game file couldn't be read, 4 writing failed or a build is already installed,
-        5 check or conflicts found something to look at.
+        5 check, conflicts or patch found something to look at.
         """;
 
     public static int Run(string[] args)
@@ -91,6 +98,8 @@ static class Cli
                 2 when Word(0) == "export" && Word(1) == "tables" => WithGame(options, (game, _) => ExportTables(game, options)),
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
                 3 when Word(0) == "new" && Word(1) == "item" => WithUnmoddedGame(options, (game, settings) => NewItem(game, settings, w[2], options)),
+                5 when Word(0) == "new" && Word(1) == "asset" => WithUnmoddedGame(options, (game, _) => NewAsset(game, w[2], w[3], w[4])),
+                1 when Word(0) == "patch" => Guarded(() => Patch(options.Apply(Settings.Load()))),
                 6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
                 2 when Word(0) == "check" => WithUnmoddedGame(options, (game, settings) => Check(game, settings, w[1])),
                 2 when Word(0) == "build" => WithUnmoddedGame(options, (game, settings) => Build(game, settings, w[1], options)),
@@ -326,7 +335,33 @@ static class Cli
             ? ModBuilder.Install(game, settings, project, options.Has("force"))
             : ModBuilder.Build(game, settings, project, options.Required("out"));
         Console.WriteLine($"Built {project.Changes} changes into:");
-        return Lines(files);
+        Lines(files);
+        return options.Has("install") && project.AddedAssets.Count > 0 ? Patch(settings) : Ok;
+    }
+
+    static int NewAsset(Game game, string projectPath, string from, string package)
+    {
+        var project = OpenOrNew(projectPath);
+        var copy = new AssetCopy(from, package);
+        if (AssetCopier.Check(game, AssetRegistry.Read(game.Provider.SaveAsset(AssetRegistry.File)), copy) is { } problem)
+            throw new EditException($"{package}: {problem}");
+        project.SetAsset(copy);
+        project.Save(projectPath);
+        return Print($"Added {package} as a copy of {from}. {project.Changes} changes in {projectPath}");
+    }
+
+    // Prints what the registry patch did. Problems exit with Found, since the assets they name won't be found in game.
+    static int Patch(Settings settings)
+    {
+        var result = RegistryPatch.Build(settings);
+        foreach (var copy in result.Added)
+            Console.WriteLine($"listed {copy.Package} (copy of {copy.From})");
+        foreach (var problem in result.Problems)
+            Console.WriteLine($"problem  {problem}");
+        Console.WriteLine(result.Pak is null
+            ? "No installed mod adds assets, so no registry patch is needed. Any old one was removed."
+            : $"Registry patch with {result.Added.Count} new assets: {result.Pak}");
+        return result.Problems.Count == 0 ? Ok : Found;
     }
 
     static ModProject LoadProject(string path) =>
@@ -361,7 +396,7 @@ static class Cli
                 File.Delete(file);
                 Console.WriteLine($"Removed {file}");
             }
-        return Ok;
+        return options.Has("install") && merged.AddedAssets.Count > 0 ? Patch(settings) : Ok;
     }
 
     static int ListConflicts(Options options) => Guarded(() =>

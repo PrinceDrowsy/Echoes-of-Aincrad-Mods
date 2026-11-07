@@ -304,6 +304,8 @@
                     </TextBlock>
                     <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                         <Button Content="Scan installed mods" Padding="8,2" Margin="0,0,4,4" Click="ScanInstalled" />
+                        <Button Content="Patch new assets" Padding="8,2" Margin="0,0,4,4" Click="PatchRegistry"
+                                ToolTip="Mods that add new things, like towns, need this after you install or remove them, so the game finds every one of them. It only takes a moment." />
                     </WrapPanel>
                     <TextBlock x:Name="InstalledInfo" DockPanel.Dock="Top" Foreground="Gray" Margin="0,0,0,4" />
                     <Grid>

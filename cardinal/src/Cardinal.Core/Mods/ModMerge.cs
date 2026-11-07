@@ -53,6 +53,11 @@ public static class ModMerge
                 Add(rows, "new row " + row.Label, project.Name, $"copy of {row.From}" + string.Concat(row.Fields.Select(f => $", {f.Key} {f.Value}")));
                 merged.SetRow(row);
             }
+            foreach (var copy in project.AddedAssets)
+            {
+                Add(rows, "new asset " + copy.Label, project.Name, $"copy of {copy.From}");
+                merged.SetAsset(copy);
+            }
             foreach (var added in project.AddedText)
             {
                 foreach (var (culture, line) in added.Text)

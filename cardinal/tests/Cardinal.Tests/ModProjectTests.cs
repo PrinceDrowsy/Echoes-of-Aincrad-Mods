@@ -57,6 +57,7 @@ public class ModProjectTests
             project.SetText(new TextEdit("ja-JP", "ST", "K", "剣", "盾"));
             project.SetRow(new RowAddition("Items/HealItem", "9", "1", new() { ["ID"] = "9" }));
             project.SetAddedText(new AddedText("ST", "K9", new() { ["en"] = "Nine" }));
+            project.SetAsset(new AssetCopy("/Game/A/Town_004", "/Game/A/Town_011"));
             project.Save(path);
 
             Assert.Contains("剣", File.ReadAllText(path));
@@ -67,6 +68,7 @@ public class ModProjectTests
             Assert.Equal(project.TextEdits, loaded.TextEdits);
             Assert.Equal("9", Assert.Single(loaded.AddedRows).Fields["ID"]);
             Assert.Equal("Nine", Assert.Single(loaded.AddedText).English);
+            Assert.Equal("Town_011", Assert.Single(loaded.AddedAssets).Name);
         }
         finally
         {

@@ -61,13 +61,27 @@ public sealed record AddedText(string Namespace, string Key, Dictionary<string, 
 }
 
 /// <summary>
+/// A new game asset the mod adds as a copy of an existing one, such as a town: From and Package are /Game paths, and
+/// Package's last segment becomes the copy's name. The game only finds primary assets through its asset registry, so
+/// the registry patch lists every installed copy (see RegistryPatch).
+/// </summary>
+public sealed record AssetCopy(string From, string Package)
+{
+    [JsonIgnore]
+    public string Label => Package;
+
+    [JsonIgnore]
+    public string Name => Package[(Package.LastIndexOf('/') + 1)..];
+}
+
+/// <summary>
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
-/// Format 2 added text edits and format 3 added rows and text; older files load unchanged.
+/// Format 2 added text edits, format 3 added rows and text, and format 4 copied assets; older files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
-    public const int CurrentFormat = 3;
+    public const int CurrentFormat = 4;
 
     // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
     // The merged patch takes the top number, so it wins over every mod it was merged from.
@@ -92,10 +106,15 @@ public sealed partial class ModProject
     public List<TextEdit> TextEdits { get; set; } = [];
     public List<RowAddition> AddedRows { get; set; } = [];
     public List<AddedText> AddedText { get; set; } = [];
+    public List<AssetCopy> AddedAssets { get; set; } = [];
 
     /// <summary>Every change of every kind.</summary>
     [JsonIgnore]
-    public int Changes => Edits.Count + TextEdits.Count + AddedRows.Count + AddedText.Count;
+    public int Changes => Edits.Count + TextEdits.Count + AddedRows.Count + AddedText.Count + AddedAssets.Count;
+
+    /// <summary>Whether a build has a container (.utoc and .ucas) besides the .pak: anything but text changes.</summary>
+    [JsonIgnore]
+    public bool HasContainer => Edits.Count + AddedRows.Count + AddedText.Count + AddedAssets.Count > 0;
 
     public static ModProject Load(string path)
     {
@@ -185,6 +204,21 @@ public sealed partial class ModProject
 
     public bool RemoveAddedText(string ns, string key) =>
         FindAddedText(ns, key) is { } text && AddedText.Remove(text);
+
+    public AssetCopy? FindAsset(string package) =>
+        AddedAssets.FirstOrDefault(a => a.Package.Equals(package, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Adds the copy, replacing an earlier one with the same package.</summary>
+    public void SetAsset(AssetCopy copy)
+    {
+        if (FindAsset(copy.Package) is { } old)
+            AddedAssets[AddedAssets.IndexOf(old)] = copy;
+        else
+            AddedAssets.Add(copy);
+    }
+
+    public bool RemoveAsset(string package) =>
+        FindAsset(package) is { } copy && AddedAssets.Remove(copy);
 
     /// <summary>
     /// The name the built files get: BaseName(), then the priority and _P.

@@ -27,9 +27,10 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
         project.Set(new ModEdit(HealItems, "1", "MaxStack", "500", "999"));
         TextEditing.Set(project, GameText.Load(game, GameText.English), GameText.English, Game.TextNamespace, "ItemName_Heal_1", "Test Gift");
         var sources = TableCatalog.Discover(game);
-        var id = ItemTemplate.NextId(sources.Single(s => s.Id == HealItems).Load(game), project, HealItems);
+        var id = ItemTemplate.NextId(sources.Single(s => s.Id == UseItems).Load(game), project, UseItems);
         ItemTemplate.Add(game, fixture.Settings, project, sources,
-            new NewItem(HealItems, "1", id, "Test Item", "A test.") { Translations = { ["ja-JP"] = ("テスト", "テストです。") } });
+            new NewItem(UseItems, "1", id, "Test Item", "A test.") { Translations = { ["ja-JP"] = ("テスト", "テストです。") } });
+        Assert.Throws<EditException>(() => ItemTemplate.Add(game, fixture.Settings, project, sources, new NewItem(HealItems, "1", 2, "Pickup", "A pickup.")));
 
         Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
         var files = ModBuilder.Install(game, fixture.Settings, project, false);
@@ -41,8 +42,8 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
         Assert.Equal("1", Value(modded, ActiveSkills, "0", "CoolTime"));
         Assert.Equal("500", Value(modded, HealItems, "1", "MaxStack"));
         Assert.Equal("Test Gift", modded.Text("ItemName_Heal_1"));
-        Assert.Equal("999", Value(modded, HealItems, key, "MaxStack"));
-        var nameKey = Value(modded, HealItems, key, "ItemKey")!;
+        Assert.Equal(Value(game, UseItems, "1", "MaxStack"), Value(modded, UseItems, key, "MaxStack"));
+        var nameKey = Value(modded, UseItems, key, "ItemKey")!;
         Assert.Equal("Test Item", modded.Text(nameKey));
         Assert.Equal("テスト", GameText.Load(modded, "ja-JP").Get(Game.TextNamespace, nameKey));
     }

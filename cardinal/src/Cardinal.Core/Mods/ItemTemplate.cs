@@ -7,7 +7,7 @@ using UAssetAPI.Unversioned;
 
 namespace Cardinal.Mods;
 
-/// <summary>A new item: its kind (an item table such as Items/HealItem), the item it starts as a copy of, its ID and its text.</summary>
+/// <summary>A new item: its kind (an item table such as Items/UseItem), the item it starts as a copy of, its ID and its text.</summary>
 public sealed record NewItem(string Kind, string From, int Id, string Name, string Description)
 {
     /// <summary>Names and descriptions in other languages, by language code. Languages left out show the English.</summary>
@@ -21,9 +21,12 @@ public sealed record NewItem(string Kind, string From, int Id, string Name, stri
 /// </summary>
 public static partial class ItemTemplate
 {
-    /// <summary>The item kinds a new item can be: one table per kind in the item asset, such as Items/HealItem.</summary>
+    /// <summary>The item kinds a new item can be: one table per kind in the item asset, such as Items/UseItem.</summary>
     public static IReadOnlyList<TableSource> Kinds(IEnumerable<TableSource> sources) =>
-        sources.Where(s => s.Group == "Items" && s.Target?.Map is not null && s.Name.EndsWith("Item")).ToList();
+        sources.Where(s => s.Group == "Items" && s.Target?.Map is not null && s.Name.EndsWith("Item") && !Pickups.Contains(s.Name)).ToList();
+
+    // One row each, and each drops as its own field pickup that's used on the spot, so a copy never reaches a chest.
+    static readonly string[] Pickups = ["HealItem", "ColItem", "SphereItem", "SkillPointItem"];
 
     /// <summary>The first ID after every ID the kind already has, counting the project's own new items.</summary>
     public static int NextId(Table kind, ModProject project, string kindId) =>
@@ -38,7 +41,7 @@ public static partial class ItemTemplate
     public static IReadOnlyList<string> Add(Game game, Settings settings, ModProject project, IReadOnlyList<TableSource> sources, NewItem item)
     {
         var kind = Kinds(sources).FirstOrDefault(s => s.Id.Equals(item.Kind, StringComparison.OrdinalIgnoreCase))
-                   ?? throw new EditException($"{item.Kind} isn't an item kind. Item kinds are the Items tables ending in Item, such as Items/HealItem.");
+                   ?? throw new EditException($"{item.Kind} isn't an item kind. Item kinds are the Items tables ending in Item, such as Items/UseItem, apart from the field pickups (heal, Col, sphere and skill point).");
         if (item.Id <= 0)
             throw new EditException("The ID must be a whole number above 0.");
         if (string.IsNullOrWhiteSpace(item.Name) || string.IsNullOrWhiteSpace(item.Description))

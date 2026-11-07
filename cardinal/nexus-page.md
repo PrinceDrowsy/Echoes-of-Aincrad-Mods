@@ -10,7 +10,8 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 - **Editing and one-button mod building:** double-click a value in the tables to change it, and build your changes into an installable mod with one button, or drop it straight into your mods folder. (ﾉ´ヮ`)ﾉ*: ･ﾟ
 - **Text editing:** rename items, rewrite descriptions, fix that one line that's always bugged you, in any of the game's 15 languages, with the English right next to it so you never lose your place. (✿◠‿◠)
 - **Translating:** export a whole language to a spreadsheet, translate it, and import it straight back as a mod. Cardinal even points out any lines whose English changed since you exported, so nothing slips through the cracks after an update.
-- **New items:** pick any item, hit **New item from this row**, and you've got a brand-new one that starts as a copy of it, with its own ID, name and description. Tweak its stats right in the table, and translate it on the Text tab if you like (every language shows your English until you do). It keeps the original's icon for now, since new icons need the Unreal kit that's coming later. Getting it into a shop or chest isn't possible yet either, so for now you can make a recipe craft it, or hand it to yourself with a dev mod. ( ´ ▽ ` )ﾉ
+- **New items:** pick an item in one of the item tables, hit **New item from this row**, and you've got a brand-new one that starts as a copy of it, with its own ID, name and description. Tweak its stats right in the table, and translate it on the Text tab if you like (every language shows your English until you do). It keeps the original's icon for now, since new icons need the Unreal kit that's coming later. Getting it into a shop or chest isn't possible yet either, so for now you can make a recipe craft it, or hand it to yourself with a dev mod. ( ´ ▽ ` )ﾉ New items are tested in the game, and so is taking them back out: remove the mod and your save still loads, the game just quietly drops the item. (The heal crystals, Col, spheres and skill points aren't offered, since those are pickups you use on the spot, so a copy could never end up in your inventory.)
+- **New assets, like towns:** add a copy of a game asset under its own name, and the game treats it as brand new. A copy of a town plus a new row in the town list gives you a new entry in the warp menu, and yes, we've warped there! (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧ It shares the original town's map for now, since new maps need the Unreal kit. This one's command line only at the moment; a **New town** button is coming.
 - **Merging:** mods that change the same game file normally just overwrite each other, so only one of them works. Cardinal keeps your mods as lists of changes instead, and can merge as many as you like into one patch where they ALL work. If two mods set the same value, you decide which one wins by putting them in order. This goes double for text mods, since the game keeps each language in a single file, so every text mod in the same language needs merging. ٩(ˊᗜˋ*)و
 - **Conflict checker:** scans every mod you have installed, made with Cardinal or not, and tells you which ones replace the same files and which copy the game will actually load. No more guessing why a mod isn't doing anything!
 - **After game updates:** Cardinal can re-check your mods against the new version of the game and tell you if anything they change has moved or disappeared, then rebuild them fresh.
@@ -19,8 +20,15 @@ It's the start of something much bigger. The goal is for anyone to be able to ma
 - **Command line:** every export also works without the window, so scripts can pull the game's data straight into your own projects. The file formats are documented in the README.
 - **Your game, your files:** Cardinal reads everything from your own copy of the game. It never ships any of the game's files or its encryption key.
 
+# For players: the Patch button
+
+Mods that add brand-new things, like towns or quests, need the game's asset registry to know about them, and only one mod can replace that file. So if you use any mods made with Cardinal that add new things, open Cardinal after installing or removing them and press **Patch new assets** on the Installed mods tab. It takes a moment, and it puts every mod's new stuff into one patch so they all work together instead of hiding each other. That's the only thing you ever need Cardinal for as a player! (๑•̀ㅂ•́)و✧ Mod managers can run it for you too, with `Cardinal.exe patch`.
+
+And hey, while you're in there, poke around the tables for a bit. That's how a lot of modders got started. (*´꒳`*)
+
 # Planned Features
 
+- A **New town** button, so you don't need the command line for new towns.
 - Outfit fitting for body replacers, in the spirit of BodySlide and Outfit Studio.
 - A quest and dialogue editor.
 - A location editor for building new places out of the game's own assets.
@@ -49,7 +57,7 @@ Cardinal shows EVERYTHING in the game's data, including enemies, quests and area
 
 # Compatibility
 
-Cardinal never touches your saves or the game's own files. The only thing it ever writes into your game folder is a mod you built, into `Paks\~mods`, and only when you hit the button. Cardinal Mappings is a tiny UE4SS mod that does nothing at all unless the game has updated, so it should work alongside any other mod. (￣▽￣)
+Cardinal never touches your saves or the game's own files. The only things it ever writes into your game folder are mods you built and the registry patch, both into `Paks\~mods`, and only when you hit the button. Cardinal Mappings is a tiny UE4SS mod that does nothing at all unless the game has updated, so it should work alongside any other mod. (￣▽￣)
 
 # Antivirus and SmartScreen
 
