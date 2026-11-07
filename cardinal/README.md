@@ -6,7 +6,7 @@ A modding tool for Echoes of Aincrad, in the spirit of Skyrim's Creation Kit. Ve
 - **Text:** read and change the game's text in all of its languages, next to the English, and export a language to CSV for translating and import it back.
 - **Editing and mod building:** change values right in the tables and lines in the Text tab, keep the changes as a small mod project, and build them into a mod with one button, or straight into the game's `~mods` folder.
 - **New items:** add an item that starts as a copy of an existing one, with its own ID, name and description in any language.
-- **New assets:** add a copy of a game asset, such as a town, under its own name, and keep every installed mod's new assets findable by the game with one registry patch.
+- **New towns and assets:** add a town with its own name in the warp list, or a copy of any game asset under its own name, and keep every installed mod's new assets findable by the game with one registry patch.
 - **Merging and conflicts:** combine several mods into one merged patch so they all work, and see which installed mods, made with Cardinal or not, replace the same game files and which copy the game loads.
 - **Map:** see each floor from above, cell by cell, colored by region, plus the HLOD grids the game draws in the distance. Switch on the developer layers the level designers left in the game, such as combat area circles with their sizes, treasure chest spots, barriers and size references. Hover for details, and switch on the cells installed mods replace.
 - **Command line:** everything the window does, scriptable, for batch work and AI assistants.
@@ -51,7 +51,9 @@ A new item changes the item asset and the main string table, so two mods that ad
 
 ## New assets and the registry patch
 
-A mod can add a copy of a game asset under a new name, such as a town: `new asset` on the command line adds `/Game/ROD/DataAssets/Town/Town_004` as `/Game/ROD/DataAssets/Town/Town_011`. The copy starts with every value of the original. Together with a new `DT_TownList` row whose `ID` is `011`, that's a new town in the warp list, sharing Urbas's map.
+A mod can add a copy of a game asset under a new name: `new asset` on the command line adds, say, `/Game/ROD/DataAssets/Town/Town_004` as `/Game/ROD/DataAssets/Town/Town_011`, with every value of the original.
+
+For towns there's a template. Select a town in **Other/DT_TownList** and press **New town from this row**, give it a town ID (the next free one is filled in) and an English name, and Cardinal adds its row, its name for the warp list (`AreaTitle_` and the name) and a copy of the town's `Town_` asset. The new town shares the original's map, gate, shops and start points, since a map of its own needs The Seed, and opens at the same story step unless you change `StoryProgress` in its row. Its name goes on the Text tab with the rest, for translating.
 
 The game only finds towns, quests and other primary assets through its asset registry, `AssetRegistry.bin`, and a mod can only replace that file whole. So instead of carrying a registry, a mod built with new assets carries a short list of them in its `.pak`, and **Patch new assets** on the Installed mods tab (or `Cardinal.exe patch`) builds one `CardinalRegistry_9999_P.pak` from every installed mod's list. It starts from the registry the game would load without it, so mods that ship their own registry keep working too.
 
@@ -105,6 +107,7 @@ Cardinal.exe build PROJECT.json --install [--force]
 Cardinal.exe check PROJECT.json
 Cardinal.exe merge A.json B.json [C.json...] --out DIR
 Cardinal.exe merge A.json B.json [C.json...] --install [--force] [--remove-single-builds]
+Cardinal.exe new town PROJECT.json --from ROW --name TEXT [--id ID]
 Cardinal.exe new asset PROJECT.json FROM PACKAGE
 Cardinal.exe patch
 Cardinal.exe conflicts
@@ -122,6 +125,7 @@ Cardinal.exe help
 - `merge` prints every value and line of text more than one project sets and which wins, then builds `CardinalMerged_9999_P`. `--remove-single-builds` deletes the merged projects' own builds from `~mods`.
 - `conflicts` prints a `mod` line per installed mod and a `conflict` line per game file, tab-separated, with what the game loads.
 - `diagnostics` prints the same report as the window's **Copy diagnostic info**.
+- `new town` adds a town that starts as a copy of `DT_TownList` row `ROW`; see [New assets and the registry patch](#new-assets-and-the-registry-patch). Without `--id` it takes the next free town ID. `set` changes fields of rows the project adds as well, such as a new town's `StoryProgress`.
 - `new asset` adds a copy of the game asset `FROM` as `PACKAGE`, both `/Game` paths; see [New assets and the registry patch](#new-assets-and-the-registry-patch). `patch` rebuilds the registry patch from every installed mod and lists each new asset; problems exit with 5.
 - `new item` adds an item to the project; see [Adding items](#adding-items). `--category` is the item table, such as `Items/UseItem`, and is needed when `ROW` is an ID in more than one. Without `--id` it takes the next free ID. For text the project adds, `text set` sets one language's line, and empty text makes that language show the English again.
 - `set`, `text set`, `text import`, `new item`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
