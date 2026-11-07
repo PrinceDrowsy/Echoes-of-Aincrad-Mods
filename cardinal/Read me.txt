@@ -21,3 +21,31 @@ A few things worth knowing:
   - Cardinal shows everything in the game's data, spoilers included. (・_・;)
 
 Bugs, questions, or something cool you made? Come say hi on the Nexus page!
+
+
+----------------------------------------------------------------------------------------------
+日本語
+
+The Cardinal System - Echoes of Aincrad用のModツール
+
+こんにちは！(ﾉ´ヮ`)ﾉ*: ･ﾟ
+
+パッチボタンだけ使いたいプレイヤーさんへ：
+  1. Cardinal.exeを起動して、セットアップ画面を一度だけ埋めてください（AES鍵の取り出し方も画面で説明しています）。
+  2. 「Installed mods」タブを開いて、「Patch new assets」を押してください。
+  3. 街みたいな新しいものを追加するModを入れたり外したりしたら、そのたびにもう一回押すだけ。
+これでおしまいです！
+
+Modを作ってみたい人へ：
+  使い方はぜんぶ、このファイルの隣にあるREADME.mdに書いてあります（今のところ英語です）。
+  まずはTablesタブで数値をダブルクリックしてみてくださいね。楽しんで！(๑•̀ㅂ•́)و✧
+
+知っておくといいこと：
+  - Cardinalはzipの中からではなく、展開したこのフォルダから起動してください。
+  - セーブデータやゲーム本体のファイルには触れません。書き込むのは自分で作ったModとレジストリパッチだけで、
+    場所はPaks\~mods、ボタンを押したときだけです。
+  - コード署名がないので、初回はWindows SmartScreenが警告を出すかもしれません。ダウンロードを確かめたいときは、
+    NexusのページにSHA-256が載っています。ウイルス対策ソフトは切らないでくださいね！
+  - Cardinalはゲームのデータをネタバレも含めてぜんぶ表示します。(・_・;)
+
+不具合や質問、作ったModの自慢は、Nexusのページでお気軽にどうぞ！

@@ -72,7 +72,7 @@ Cardinal never touches your saves or the game's own files. The only things it ev
 
 Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the [url=https://github.com/PrinceDrowsy/Echoes-of-Aincrad-Mods]source code on GitHub[/url] and build it yourself. Please never turn off your security software just to run a mod tool!
 
-SHA-256 of Cardinal.exe (0.5.1): 266855D248D6400A2E788A547D649CF7787A8F7FC10A2F63404DAD39004A66C2
+SHA-256 of Cardinal.exe (0.5.1): 58853B5EF95D085782BAB1F1A0FC48A254296D8BA2250F38506BDB20C16EFF56
 
 Cardinal has no auto-updater, no telemetry and no background connection. It only goes online when you press the Oodle download button, or the first time you build a mod.
 
