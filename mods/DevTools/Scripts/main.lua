@@ -29,6 +29,11 @@ bind(Key.F5, "state", function(pc)
         .. " deathGame=" .. tostring(game and game:IsValid() and game:IsDeathGameMode())
         .. " dead=" .. tostring(avatar and avatar:IsValid() and avatar:IsDead()))
     log("map=" .. pc:GetWorld():GetFullName())
+    local received = {}
+    game.QuestReceiveList:ForEach(function(_, id)
+        table.insert(received, id:get())
+    end)
+    log("received quests=" .. table.concat(received, ","))
 end)
 
 local CAN_SWITCH = { [0] = "OK", "FailAttacking", "FailNoPartner", "FailNoTarget", "FailVoiceWait", "FailCantAction", "FailCantAttack" }
@@ -114,10 +119,14 @@ end)
 -- this build. They write to the save, and the game has anti-cheat for online play, so solo only.
 local COL = 10000
 local EXP = 5000
--- Category is the EItemCategory number Cardinal shows for the item (33 is healing items).
-local GIVE_ITEM = { Category = 33, ItemId = 1, Num = 5 }
+-- Category is the EItemCategory number Cardinal shows for the item. Potions are usables (1); heal (33) is the
+-- crystal pickup, which never goes into a chest.
+local GIVE_ITEM = { Category = 1, ItemId = 1, Num = 5 }
 -- A playable quest is always a QST_Free_ number: 1NNNN for main quests, 2NNNN for side quests.
 local GIVE_QUEST = 20001
+-- A MainStory_ step. Town warping opens at 29000, but a step's opening event can lock the gate until it ends
+-- (TargetDenyGimmicks). 33000 is the first step after that with no lock and no main quest running.
+local SET_STORY = 33000
 
 local function cheat(key, label, action)
     RegisterKeyBind(key, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
@@ -160,6 +169,22 @@ end)
 -- What an NPC handing out a side quest does: adds it to the received list.
 cheat(Key.FIVE, "receive quest " .. GIVE_QUEST, function()
     FindFirstOf("RODInGamePlayerController"):ServerAddQuestList({ GIVE_QUEST }, {})
+end)
+
+-- Skips the story ahead, which can leave quests and events out of step, so throwaway saves only.
+cheat(Key.SIX, "set story progress " .. SET_STORY, function()
+    local game = FindFirstOf("RODGameState")
+    log("story progress was " .. game.MainStoryProgress)
+    FindFirstOf("RODInGamePlayerController"):ServerDebugSetMainStoryProgress(SET_STORY)
+    log("story progress is " .. game.MainStoryProgress)
+end)
+
+-- Dyeing unlocks through a side story step (RODGameConfig.ReleaseEquipmentColorChange). This sets the same release
+-- flag, so the menu opens normally afterwards. Opening the palette before release crashes the game.
+cheat(Key.SEVEN, "release outfit dyeing", function(state)
+    log("ReleaseEquipmentChangeColor was " .. state.ReleaseEquipmentChangeColor)
+    state.ReleaseEquipmentChangeColor = 1
+    state:OnRep_ReleaseEquipmentChangeColor()
 end)
 
 -- dev.ps1 bench times the gap between the first two marks. Works without being in game, so it can start a load.

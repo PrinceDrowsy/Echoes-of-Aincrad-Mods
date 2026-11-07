@@ -20,7 +20,7 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 
 | Key | Action |
 |---|---|
-| Ctrl+F5 | Log quest, Death Game and map state |
+| Ctrl+F5 | Log quest, Death Game and map state, and the received quests |
 | Ctrl+F6 | Log `CanSwitch` and call `PlaySwitchAction` if it's allowed |
 | Ctrl+F7 | Show a test chat message with custom text |
 | Ctrl+F8 | Start the quest set in `START_QUEST` |
@@ -33,6 +33,8 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Ctrl+Shift+3 | Add 5,000 experience |
 | Ctrl+Shift+4 | Toggle noclip, if the game still has its cheat manager |
 | Ctrl+Shift+5 | Receive the quest set in `GIVE_QUEST`, as if an NPC handed it out (a `QST_Free_` number) |
+| Ctrl+Shift+6 | Jump the main story to the step in `SET_STORY`. Throwaway saves only |
+| Ctrl+Shift+7 | Release outfit dyeing before its side story does. Open the equipment menu after, not before |
 
 The cheats write to the save and are for solo play only, since the game has anti-cheat for online play.
 
