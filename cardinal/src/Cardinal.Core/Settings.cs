@@ -80,7 +80,7 @@ public sealed class Settings
         if (!HasValidKey)
             yield return "The AES key is missing or isn't 64 hex digits (an optional 0x in front is fine).";
         if (string.IsNullOrWhiteSpace(MappingsFile) || !File.Exists(MappingsFile))
-            yield return "The mappings (.usmap) file isn't set or doesn't exist.";
+            yield return "The mappings (.usmap) file isn't set or doesn't exist. Install Cardinal Mappings with UE4SS and start the game once, and Cardinal finds it by itself.";
         if (string.IsNullOrWhiteSpace(OodleFile) || !File.Exists(OodleFile))
             yield return "The Oodle library isn't set. Choose one, or download it from the setup screen.";
     }
