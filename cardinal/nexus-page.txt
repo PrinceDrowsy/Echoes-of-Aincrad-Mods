@@ -60,6 +60,8 @@ And hey, while you're in there, poke around the tables for a bit. That's how a l
 
 If you'd rather not use Cardinal Mappings, you can make the mappings file yourself with UE4SS's DumpUSMAP() and pick it on the setup screen instead.
 
+If you downloaded Cardinal Mappings before 0.5.2, please grab it again! The older versions were missing a file, so they never started and never wrote the mappings. Sorry about that! (・_・;)
+
 [size=5][b]Spoilers[/b][/size]
 
 Cardinal shows EVERYTHING in the game's data, including enemies, quests and areas you might not have reached yet. If you're still on your first playthrough, keep that in mind before you go browsing. (・_・;)
@@ -72,7 +74,7 @@ Cardinal never touches your saves or the game's own files. The only things it ev
 
 Cardinal isn't signed, since signing certificates cost money I'd rather not spend on a free tool. That means Windows SmartScreen or your antivirus might warn you the first time you run it, even though it's clean. (´・ω・`) If you want to be sure, check that your download matches the SHA-256 below, or read the [url=https://github.com/PrinceDrowsy/Echoes-of-Aincrad-Mods]source code on GitHub[/url] and build it yourself. Please never turn off your security software just to run a mod tool!
 
-SHA-256 of Cardinal.exe (0.5.1): 58853B5EF95D085782BAB1F1A0FC48A254296D8BA2250F38506BDB20C16EFF56
+SHA-256 of Cardinal.exe (0.5.2): 1BD6619020067A654C096805D45AD6CF8D1BCB763F9DCA22D664DF88A3131348
 
 Cardinal has no auto-updater, no telemetry and no background connection. It only goes online when you press the Oodle download button, or the first time you build a mod.
 
