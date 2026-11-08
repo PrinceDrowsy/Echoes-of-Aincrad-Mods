@@ -141,6 +141,17 @@ Output goes to stdout, errors to stderr. Exit codes:
 | 4 | Writing the output failed, or `--install` found an earlier build without `--force` |
 | 5 | `check`, `conflicts`, `patch` or `text import` found something to look at |
 
+A whole mod from the command line, from finding a value to having it in the game, once setup is done:
+
+```
+Cardinal.exe export tables --out tables --only Skills/DT_ActiveSkillList
+Cardinal.exe set FasterRecovery.json Skills/DT_ActiveSkillList 0 CoolTime 2.5
+Cardinal.exe check FasterRecovery.json
+Cardinal.exe build FasterRecovery.json --install
+```
+
+The export shows the table's rows and columns as CSV and JSON, so the row key and column name for `set` can be read from it. The first `set` creates the project file; each later command adds to it. Scripts can stop at the first nonzero exit code: nothing is installed unless every change checks out. A mod that adds towns or other assets needs `Cardinal.exe patch` after it's installed or removed.
+
 ## Mod projects
 
 A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 4. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, and version 4 `addedAssets`. Older files open unchanged, and are saved as version 4.
