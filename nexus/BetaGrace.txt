@@ -1,3 +1,5 @@
+日本語の説明はページの下にあります♪ ↓
+
 [size=5][b]Description[/b][/size]
 
 In the books, the death game doesn't start until the beta test is over. Everyone gets their fun little beta, and THEN Kayaba drops the bomb. (ﾟДﾟ;) In Echoes of Aincrad's Death Game mode though, dying in the beta part of the story already deletes your save, before the death game has even started!
@@ -51,6 +53,12 @@ It only changes one list in the game's settings while the game runs, so it shoul
 [size=5][b]Bugs[/b][/size]
 
 If a beta death still deletes your save, or a death after the beta doesn't, please tell me in the bug reports tab, and include the lines starting with [BetaGrace] from your UE4SS log (ue4ss\UE4SS.log). Turning on Extra logging in Mod Menu or config.lua makes them more detailed. m(_ _)m
+
+[size=5][b]Check out my other mods![/b][/size]
+
+[list]
+[*][url=https://www.nexusmods.com/echoesofaincrad/mods/102]The Cardinal System[/url]: a modding tool for Echoes of Aincrad, like Skyrim's Creation Kit. Browse the game's data, change it, and build your own mods with one button. (ﾉ◕ヮ◕)ﾉ*:･ﾟ✧
+[/list]
 
 [size=5][b]Credits[/b][/size]
 
