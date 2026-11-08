@@ -24,6 +24,7 @@ public static class TableCatalog
 {
     const string DataAssets = "ROD/DataAssets/";
     const string ItemDataAsset = Game.ContentRoot + DataAssets + "Items/ItemDataAsset.uasset";
+    const string AvatarDataAsset = Game.ContentRoot + DataAssets + "AvatarParts/AvatarCustomize/AvatarCustomizeDataAsset.uasset";
     const string EnemyPackages = Game.ContentRoot + DataAssets + "Enemies/DA_EnemyPackageData.uasset";
     const string QuestsSource = "/Game/" + DataAssets + "Quests/";
 
@@ -42,9 +43,14 @@ public static class TableCatalog
             sources.Add(new TableSource(group, name, AssetPath(path), g => DataTable(g, path, name), new EditTarget(path, null)));
         }
 
-        foreach (var map in ItemMaps(game))
-            sources.Add(new TableSource("Items", map, AssetPath(ItemDataAsset), g => ItemMap(g, map),
-                new EditTarget(ItemDataAsset, map + "DataAsMap")));
+        void AddMaps(string group, string asset)
+        {
+            foreach (var map in AssetMaps(game, asset))
+                sources.Add(new TableSource(group, map, AssetPath(asset), g => AssetMap(g, asset, map),
+                    new EditTarget(asset, map + "DataAsMap")));
+        }
+
+        AddMaps("Items", ItemDataAsset);
         foreach (var path in game.FindFiles(DataAssets + "Games/DataTables/DT_ShopItemList", ".uasset"))
             AddDataTable("Items", path);
 
@@ -62,6 +68,9 @@ public static class TableCatalog
                 AddDataTable("Skills", path);
 
         sources.Add(new TableSource("Quests", "Quests", QuestsSource, Quests));
+
+        // The character creator's menus: parts, voices and color palettes.
+        AddMaps("Avatar", AvatarDataAsset);
 
         foreach (var path in game.FindFiles("ROD/", ".uasset").Where(p => Path.GetFileName(p).StartsWith("DT_")))
             AddDataTable("Other", path);
@@ -82,25 +91,25 @@ public static class TableCatalog
         return new Table(name, AssetPath(path), rows);
     }
 
-    // The item asset holds one map per item kind, such as MaterialItemDataAsMap.
-    static IEnumerable<string> ItemMaps(Game game)
+    // Some data assets hold their rows as maps, one per kind, such as the item asset's MaterialItemDataAsMap.
+    static IEnumerable<string> AssetMaps(Game game, string asset)
     {
-        if (!game.Provider.Files.ContainsKey(ItemDataAsset))
+        if (!game.Provider.Files.ContainsKey(asset))
             return [];
-        return game.Load<UObject>(ItemDataAsset).Properties
+        return game.Load<UObject>(asset).Properties
             .Select(p => p.Name.Text)
             .Where(n => n.EndsWith("DataAsMap"))
             .Select(n => n[..^"DataAsMap".Length]);
     }
 
-    static Table ItemMap(Game game, string map)
+    static Table AssetMap(Game game, string path, string map)
     {
-        var asset = ToJson(game.Load<UObject>(ItemDataAsset));
+        var asset = ToJson(game.Load<UObject>(path));
         var entries = asset["Properties"]?[map + "DataAsMap"] as JArray ?? [];
         var rows = entries.OfType<JObject>()
             .Select(e => Row(game, e["Key"]?.ToString() ?? "", e["Value"] as JObject ?? []))
             .ToList();
-        return new Table(map, AssetPath(ItemDataAsset), rows);
+        return new Table(map, AssetPath(path), rows);
     }
 
     static Table EnemyBlueprints(Game game)
