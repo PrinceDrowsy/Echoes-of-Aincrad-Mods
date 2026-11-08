@@ -17,9 +17,11 @@ param(
     [Parameter(Position = 2)]
     [string]$Version,
     [Parameter(Position = 3)]
-    [string]$Out = "$PSScriptRoot\release"
+    [string]$Out
 )
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell leaves $PSScriptRoot empty in parameter defaults, so this one is set here.
+if (-not $Out) { $Out = "$PSScriptRoot\release" }
 
 $GameExe = 'EchoesofAincrad-Win64-Shipping'
 $AppId = 2244210
