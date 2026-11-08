@@ -7,12 +7,17 @@
 #   play / stop      launch through Steam or close the game
 #   log [text]       show the current UE4SS log, optionally only lines containing text
 #   bench [label]    record memory, disk and CPU until the game closes or Ctrl+C. Ctrl+F12 in game marks load start and end
+#   pack <mod> <version> [folder]   zip the mod as players get it, into release\ unless a folder is given
 param(
     [Parameter(Mandatory, Position = 0)]
-    [ValidateSet('deploy', 'undeploy', 'backup', 'restore', 'backups', 'play', 'stop', 'log', 'bench')]
+    [ValidateSet('deploy', 'undeploy', 'backup', 'restore', 'backups', 'play', 'stop', 'log', 'bench', 'pack')]
     [string]$Command,
     [Parameter(Position = 1)]
-    [string]$Name
+    [string]$Name,
+    [Parameter(Position = 2)]
+    [string]$Version,
+    [Parameter(Position = 3)]
+    [string]$Out = "$PSScriptRoot\release"
 )
 $ErrorActionPreference = 'Stop'
 
@@ -31,13 +36,31 @@ function Find-GameFolder {
     throw 'Echoes of Aincrad was not found in any Steam library.'
 }
 
-$Win64 = "$(Find-GameFolder)\EchoesofAincrad\Binaries\Win64"
-$UeLog = "$Win64\ue4ss\UE4SS.log"
+# Packing works without the game installed, so Cardinal's release can call it anywhere.
+if ($Command -ne 'pack') {
+    $Win64 = "$(Find-GameFolder)\EchoesofAincrad\Binaries\Win64"
+    $UeLog = "$Win64\ue4ss\UE4SS.log"
+}
 $Saves = "$env:LOCALAPPDATA\EchoesofAincrad\Saved\SaveGames"
 $Backups = "$PSScriptRoot\backups"
 
 function Assert-GameClosed {
     if (Get-Process $GameExe -ErrorAction SilentlyContinue) { throw 'Close the game first.' }
+}
+
+# A mod as it runs in game: its own folder plus the shared scripts. Deploying and packing both go through here,
+# so a release always holds what was tested.
+function Copy-Mod([string]$Into) {
+    if (-not (Test-Path "$PSScriptRoot\mods\$Name\Scripts\main.lua")) { throw "No mod named '$Name'." }
+    $target = "$Into\$Name"
+    if (Test-Path $target) { Remove-Item $target -Recurse -Force }
+    New-Item -ItemType Directory -Force $Into | Out-Null
+    Copy-Item "$PSScriptRoot\mods\$Name" $Into -Recurse
+    Copy-Item "$PSScriptRoot\shared\*" "$target\Scripts"
+    $missing = Get-ChildItem "$target\Scripts" -Filter *.lua | Select-String 'require\("([^"]+)"\)' -AllMatches |
+        ForEach-Object { $_.Matches.Groups[1].Value } | Where-Object { -not (Test-Path "$target\Scripts\$_.lua") } | Sort-Object -Unique
+    if ($missing) { throw "$Name requires scripts that aren't in its folder: $($missing -join ', ')" }
+    $target
 }
 
 function Save-Snapshot([string]$Label) {
@@ -72,12 +95,24 @@ function Write-BenchSummary([string]$Csv) {
 switch ($Command) {
     'deploy' {
         Assert-GameClosed
-        if (-not (Test-Path "$PSScriptRoot\mods\$Name\Scripts\main.lua")) { throw "No mod named '$Name'." }
-        $target = "$Win64\ue4ss\Mods\$Name"
-        if (Test-Path $target) { Remove-Item $target -Recurse -Force }
-        Copy-Item "$PSScriptRoot\mods\$Name" "$Win64\ue4ss\Mods" -Recurse
-        Copy-Item "$PSScriptRoot\shared\*" "$target\Scripts"
+        Copy-Mod "$Win64\ue4ss\Mods" | Out-Null
         "Deployed $Name"
+    }
+    # One folder per zip, so players drop it into ue4ss\Mods as it is.
+    'pack' {
+        if (-not $Version) { throw 'pack needs a version, such as .\dev.ps1 pack BetaGrace 1.0.0' }
+        $stage = Copy-Mod "$Out\stage"
+        if ($bad = Get-ChildItem $stage -Recurse -File | Where-Object { $_.Extension -notin '.lua', '.txt', '.md' }) {
+            throw "Only scripts and text may ship in a Lua mod: $($bad.Name -join ', ')"
+        }
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        # Windows PowerShell's zip writer uses backslashes in entry names by default, which other extractors reject.
+        [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash', $false)
+        $zip = "$Out\$Name-$Version.zip"
+        if (Test-Path $zip) { Remove-Item $zip }
+        [IO.Compression.ZipFile]::CreateFromDirectory($stage, $zip, 'Optimal', $true)
+        Remove-Item "$Out\stage" -Recurse -Force
+        $zip
     }
     'bench' {
         $game = Get-Process $GameExe -ErrorAction SilentlyContinue | Select-Object -First 1

@@ -63,8 +63,7 @@ function Release {
     foreach ($required in 'retoc.exe', 'repak.exe', 'LICENSE') {
         if (-not (Test-Path "$out\$required")) { throw "A release needs $required in $out." }
     }
-    $shipped = Get-ChildItem $out, "$PSScriptRoot\..\mods\CardinalMappings" -Recurse -File
-    if ($bad = $shipped | Where-Object { $_.Extension -in '.usmap', '.pdb', '.locres', '.uasset', '.utoc', '.ucas' -or $_.Name -like 'oo2core*' }) {
+    if ($bad = Get-ChildItem $out -Recurse -File | Where-Object { $_.Extension -in '.usmap', '.pdb', '.locres', '.uasset', '.utoc', '.ucas' -or $_.Name -like 'oo2core*' }) {
         throw "Game files, mappings, Oodle or debug files must never ship: $($bad.Name -join ', ')"
     }
 
@@ -76,17 +75,15 @@ function Release {
         New-Item -ItemType Directory $folder | Out-Null
     }
     Copy-Item $out "$stage\Cardinal" -Recurse
-    Copy-Item "$PSScriptRoot\..\mods\CardinalMappings" "$stage\CardinalMappings" -Recurse
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     # Windows PowerShell's zip writer uses backslashes in entry names by default, which other extractors reject.
     [AppContext]::SetSwitch('Switch.System.IO.Compression.ZipFile.UseBackslash', $false)
-    $files = @("$out\Cardinal.exe")
-    foreach ($name in 'Cardinal', 'CardinalMappings') {
-        $zip = "$release\$name-$version.zip"
-        [IO.Compression.ZipFile]::CreateFromDirectory("$stage\$name", $zip, 'Optimal', $true)
-        $files += $zip
-    }
+    $zip = "$release\Cardinal-$version.zip"
+    [IO.Compression.ZipFile]::CreateFromDirectory("$stage\Cardinal", $zip, 'Optimal', $true)
+    # Packed like every other Lua mod, so it carries the shared scripts it needs.
+    $mappings = & "$PSScriptRoot\..\dev.ps1" pack CardinalMappings $version $release
+    $files = @("$out\Cardinal.exe", $zip, $mappings)
     $hashes = $files | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash)  $(Split-Path $_ -Leaf)" }
     $hashes | Set-Content "$release\SHA256.txt" -Encoding Ascii
     $hashes
