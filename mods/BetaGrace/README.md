@@ -24,6 +24,10 @@ With Mod Menu, both settings change live, no restart needed. Without it, edit `B
 - **Protect Death Game saves during the beta** (`ENABLED`, on by default). Turn it off to take the risk back.
 - **Extra logging** (`DEBUG_LOGS`, off by default). Only useful for bug reports.
 
+## Compatibility
+
+It only changes one list in the game's settings while the game runs, so it should work alongside most mods. Seamless Aincrad stays off during the beta, so the two don't overlap. A mod that opens the field during the beta would need more: a death outside a quest there isn't covered.
+
 ## Uninstalling
 
 Delete the `BetaGrace` folder. Beta Grace never writes to your save, so removing it is safe at any point. From then on, a death during the beta deletes a Death Game save again, as in the unmodded game.

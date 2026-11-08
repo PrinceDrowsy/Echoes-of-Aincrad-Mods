@@ -1,0 +1,65 @@
+[size=5][b]Description[/b][/size]
+
+In the books, the death game doesn't start until the beta test is over. Everyone gets their fun little beta, and THEN Kayaba drops the bomb. (ﾟДﾟ;) In Echoes of Aincrad's Death Game mode though, dying in the beta part of the story already deletes your save, before the death game has even started!
+
+Beta Grace fixes that. In Death Game mode, dying during the beta won't delete your save anymore, so you can learn the ropes in peace. Once the beta is over, Death Game is exactly as merciless as it always was. ( ˘ω˘ )
+
+[size=5][b]Features[/b][/size]
+
+[list]
+[*][b]A grace period for the beta:[/b] a death in any of the five beta quests restarts the quest like in normal mode, instead of ending your run. Your save keeps its Death Game status the whole time.
+[*][b]The real death game stays real:[/b] the moment the beta is over, a death deletes your save just like in the unmodded game. Beta Grace doesn't touch anything after that point.
+[*][b]Uses the game's own rules:[/b] the game already keeps a list of quests where a death doesn't count for Death Game. Beta Grace just adds the beta quests to it, and it reads which quests those are from the game itself, so it should keep working after updates. If an update ever changes things too much, it turns itself off and says so in the UE4SS log instead of guessing.
+[*][b]A switch in Mod Menu:[/b] with [url=https://www.nexusmods.com/echoesofaincrad/mods/84]Mod Menu[/url] installed, you can turn the protection off and on in game, no restart needed. Without it, it's one line in config.lua.
+[*][b]Never touches your save:[/b] it only changes things while the game runs, so you can add or remove it at any point.
+[/list]
+
+[size=5][b]What I tested[/b][/size]
+
+Death Game saves on game version 1.0.6, with the story jumped to each point using a dev tool:
+
+[list]
+[*]Deaths in beta quests 1, 2 and 4: the quest restarted and the save stayed. ヽ(・∀・)ﾉ
+[*]A death in the first quest after the beta: "Your save data has been deleted," as it should be.
+[*]Quests 3 and 5 weren't tested one by one, but they're on the same list as the others, so they work the same way.
+[*]Between beta quests the town gates stay shut, so there's nowhere to die outside a quest during the beta.
+[/list]
+
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*][url=https://www.nexusmods.com/echoesofaincrad/mods/7]UE4SS for Echoes of Aincrad[/url]
+[*]Optional: [url=https://www.nexusmods.com/echoesofaincrad/mods/84]Mod Menu[/url], for the in-game switch
+[/list]
+
+[size=5][b]Installation[/b][/size]
+
+[list=1]
+[*]Install UE4SS if you haven't already.
+[*]Put the BetaGrace folder from the download in EchoesofAincrad/Binaries/Win64/ue4ss/Mods/ in your game folder.
+[*]That's it! The UE4SS log says "protecting quests 10001-10005" when it's working. (๑•̀ㅂ•́)و✧
+[/list]
+
+[size=5][b]Uninstalling[/b][/size]
+
+Delete the BetaGrace folder. Your save is never changed, so it's safe at any point. From then on, a death during the beta deletes a Death Game save again, like in the unmodded game.
+
+[size=5][b]Compatibility[/b][/size]
+
+It only changes one list in the game's settings while the game runs, so it should work alongside pretty much anything. [url=https://www.nexusmods.com/echoesofaincrad/mods/100]Seamless Aincrad[/url] stays off during the beta by design, so the two don't get in each other's way, though I haven't played them together yet. If you use a mod that opens the field during the beta, let me know! A death outside a quest there isn't covered yet.
+
+[size=5][b]Bugs[/b][/size]
+
+If a beta death still deletes your save, or a death after the beta doesn't, please tell me in the bug reports tab, and include the lines starting with [BetaGrace] from your UE4SS log (ue4ss\UE4SS.log). Turning on Extra logging in Mod Menu or config.lua makes them more detailed. m(_ _)m
+
+[size=5][b]Credits[/b][/size]
+
+[list]
+[*]eluwave, for the UE4SS build the whole Echoes of Aincrad modding scene runs on.
+[*]ANONYKILLER, for Mod Menu.
+[*]Reki Kawahara, for writing a death game that starts after the beta. (ノ´ヮ`)ノ*: ･ﾟ
+[/list]
+
+[size=5][b]License[/b][/size]
+
+MIT, and the source is on [url=https://github.com/PrinceDrowsy/Echoes-of-Aincrad-Mods]GitHub[/url]. Take it apart, learn from it, build on it! ＼(^o^)／
