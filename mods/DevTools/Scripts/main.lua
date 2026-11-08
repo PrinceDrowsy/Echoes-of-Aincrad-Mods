@@ -130,6 +130,8 @@ local SET_SIDE_STORY = { ID = "2022", Progress = 2000 }
 -- A MainStory_ step. Town warping opens at 29000, but a step's opening event can lock the gate until it ends
 -- (TargetDenyGimmicks). 33000 is the first step after that with no lock and no main quest running.
 local SET_STORY = 33000
+-- The hand mirror scene runs as step 23000's opening event and ends in the character creator.
+local MIRROR_STORY = 23000
 
 local function cheat(key, label, action)
     RegisterKeyBind(key, { ModifierKey.CONTROL, ModifierKey.SHIFT }, function()
@@ -174,12 +176,21 @@ cheat(Key.FIVE, "receive quest " .. GIVE_QUEST, function()
     FindFirstOf("RODInGamePlayerController"):ServerAddQuestList({ GIVE_QUEST }, {})
 end)
 
--- Skips the story ahead, which can leave quests and events out of step, so throwaway saves only.
-cheat(Key.SIX, "set story progress " .. SET_STORY, function()
+local function setStory(step)
     local game = FindFirstOf("RODGameState")
     log("story progress was " .. game.MainStoryProgress)
-    FindFirstOf("RODInGamePlayerController"):ServerDebugSetMainStoryProgress(SET_STORY)
+    FindFirstOf("RODInGamePlayerController"):ServerDebugSetMainStoryProgress(step)
     log("story progress is " .. game.MainStoryProgress)
+end
+
+-- Skips the story ahead, which can leave quests and events out of step, so throwaway saves only.
+cheat(Key.SIX, "set story progress " .. SET_STORY, function()
+    setStory(SET_STORY)
+end)
+
+-- The event only starts when a save loads at that step, so return to the title and load again after this.
+cheat(Key.NINE, "set story to the hand mirror scene", function()
+    setStory(MIRROR_STORY)
 end)
 
 -- What a giver's conversation does besides handing out the quest. Throwaway saves only, like the story jump.
@@ -199,5 +210,15 @@ end)
 RegisterKeyBind(Key.F12, { ModifierKey.CONTROL }, function()
     log("mark")
 end)
+
+-- When and from which story step the character creator takes over, for opening it at other points.
+for _, class in ipairs({ "/Script/ROD.RODGameMode_AvatarCustomize", "/Script/ROD.RODAvaterCustomizeFlowManager",
+    "/Script/ROD.RODPlayerNameEntryFlowManager" }) do
+    NotifyOnNewObject(class, function(object)
+        local game = FindFirstOf("RODGameState")
+        log("created " .. object:GetFullName() .. " at story "
+            .. tostring(game and game:IsValid() and game.MainStoryProgress))
+    end)
+end
 
 log("loaded")

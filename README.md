@@ -36,6 +36,7 @@ No-Intro (Nexus mod 3) stays in `~mods` during testing to skip the start-up logo
 | Ctrl+Shift+6 | Jump the main story to the step in `SET_STORY`. Throwaway saves only |
 | Ctrl+Shift+7 | Release outfit dyeing before its side story does. Open the equipment menu after, not before |
 | Ctrl+Shift+8 | Set the side story in `SET_SIDE_STORY` to its progress step, as a quest giver's conversation would. Throwaway saves only |
+| Ctrl+Shift+9 | Jump the main story to the hand mirror scene. Load the save again to play it and reach the character creator. Throwaway saves only |
 
 The cheats write to the save and are for solo play only, since the game has anti-cheat for online play.
 
