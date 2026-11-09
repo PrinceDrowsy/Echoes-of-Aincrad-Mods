@@ -110,6 +110,72 @@
                 </Grid>
             </TabItem>
 
+            <TabItem Header="Scripts" x:Name="ScriptsTab" IsEnabled="False">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="280" />
+                        <ColumnDefinition Width="5" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="4">
+                            <TextBlock DockPanel.Dock="Left" Text="Find" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <TextBox x:Name="ScriptSearchBox" TextChanged="ScriptSearchChanged"
+                                     ToolTip="Shows the scripts whose folder or name contains this, such as Tutorial or pev_01_01." />
+                        </DockPanel>
+                        <ListBox x:Name="ScriptList" SelectionChanged="ScriptSelected" DisplayMemberPath="Name">
+                            <ListBox.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" Margin="0,8,0,2" />
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ListBox.GroupStyle>
+                        </ListBox>
+                    </DockPanel>
+                    <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" />
+                    <DockPanel Grid.Column="2">
+                        <DockPanel DockPanel.Dock="Top" Margin="6,4,6,0">
+                            <CheckBox x:Name="TechnicalBox" DockPanel.Dock="Right" Content="Technical view" Margin="12,0,0,0" Click="ScriptViewChanged"
+                                      ToolTip="Shows every step with its class, raw settings and id, as a step change in a project refers to them." />
+                            <CheckBox x:Name="StagingBox" DockPanel.Dock="Right" Content="Show staging" Click="ScriptViewChanged"
+                                      ToolTip="Also shows the steps that only stage a scene: camera moves, animations, looks, fades and waits." />
+                            <TextBlock x:Name="ScriptInfo" Foreground="Gray" TextWrapping="Wrap"
+                                       Text="The game's scripts for story events, quests and tutorials. Pick one to see what happens in it." />
+                        </DockPanel>
+                        <DataGrid x:Name="StepGrid" AutoGenerateColumns="False" IsReadOnly="True" HeadersVisibility="Column" Margin="0,4,0,0"
+                                  CanUserAddRows="False" CanUserDeleteRows="False" EnableRowVirtualization="True">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Copy step id" Click="CopyStepId" />
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Resources>
+                                <Style x:Key="Wrapped" TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                </Style>
+                            </DataGrid.Resources>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="#" Binding="{Binding Number}" Width="40" />
+                                <DataGridTextColumn x:Name="WhatColumn" Header="What happens" Binding="{Binding Text}" Width="*"
+                                                    ElementStyle="{StaticResource Wrapped}" />
+                                <DataGridTextColumn x:Name="ThenColumn" Header="Then" Binding="{Binding Then}" Width="160"
+                                                    ElementStyle="{StaticResource Wrapped}" />
+                                <DataGridTextColumn x:Name="KindColumn" Header="Step" Binding="{Binding Kind}" Width="200" Visibility="Collapsed" />
+                                <DataGridTextColumn x:Name="SettingsColumn" Header="Settings" Binding="{Binding Settings}" Width="*"
+                                                    ElementStyle="{StaticResource Wrapped}" Visibility="Collapsed" />
+                                <DataGridTextColumn x:Name="LeadsColumn" Header="Leads to" Binding="{Binding Leads}" Width="240"
+                                                    ElementStyle="{StaticResource Wrapped}" Visibility="Collapsed" />
+                                <DataGridTextColumn x:Name="IdColumn" Header="Step id" Binding="{Binding Id}" Width="290" FontFamily="Consolas"
+                                                    Visibility="Collapsed" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
             <TabItem Header="Text" x:Name="TextTab" IsEnabled="False">
                 <DockPanel>
                     <DockPanel DockPanel.Dock="Top" Margin="4">

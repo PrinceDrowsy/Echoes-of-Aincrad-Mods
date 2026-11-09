@@ -6,6 +6,7 @@ using System.Windows.Data;
 using System.Windows.Media;
 using Cardinal.Maps;
 using Cardinal.Mods;
+using Cardinal.Scripts;
 using Cardinal.Tables;
 using Cardinal.Text;
 using Microsoft.Win32;
@@ -50,6 +51,9 @@ public partial class MainWindow : Window
     readonly Dictionary<string, Locres> texts = new(StringComparer.OrdinalIgnoreCase);
     string? culture;
     List<TextRow> textRows = [];
+
+    Script? script;
+    StepText? stepText;
 
     ModProject project = new();
     string? projectPath;
@@ -142,7 +146,8 @@ public partial class MainWindow : Window
         var opened = await Run("Opening the game files...", () =>
         {
             var g = Game.Open(settings);
-            return (Game: g, Tables: TableCatalog.Discover(g), Floors: FloorMap.Floors(g), Cultures: GameText.Cultures(g));
+            return (Game: g, Tables: TableCatalog.Discover(g), Floors: FloorMap.Floors(g), Cultures: GameText.Cultures(g),
+                Scripts: Script.List(g));
         });
         if (opened.Game is null)
             return;
@@ -160,13 +165,19 @@ public partial class MainWindow : Window
         var view = new ListCollectionView(opened.Tables.ToList());
         view.GroupDescriptions.Add(new PropertyGroupDescription(nameof(TableSource.Group)));
         TableList.ItemsSource = view;
+        var scripts = new ListCollectionView(opened.Scripts.ToList());
+        scripts.GroupDescriptions.Add(new PropertyGroupDescription(nameof(ScriptSource.Folder)));
+        ScriptList.ItemsSource = scripts;
+        StepGrid.ItemsSource = null;
+        script = null;
+        stepText = null;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
         CultureBox.ItemsSource = opened.Cultures.Select(c => new CultureItem(c, GameText.Name(c))).ToList();
         CultureBox.SelectedIndex = opened.Cultures.ToList().FindIndex(c => c == GameText.English);
-        TablesTab.IsEnabled = TextTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
+        TablesTab.IsEnabled = ScriptsTab.IsEnabled = TextTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
         ShowMergeList();
-        Status.Text = $"Opened. {opened.Tables.Count} tables and {opened.Floors.Count} floors found.";
+        Status.Text = $"Opened. {opened.Tables.Count} tables, {opened.Scripts.Count} scripts and {opened.Floors.Count} floors found.";
         Tabs.SelectedItem = TablesTab;
     }
 
@@ -186,6 +197,77 @@ public partial class MainWindow : Window
         NewTownButton.Visibility = selected.Id == TownTemplate.Table ? Visibility.Visible : Visibility.Collapsed;
         Status.Text = $"{selected.Group} / {selected.Name}";
         await CheckEditable(selected);
+    }
+
+    async void ScriptSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (game is null || ScriptList.SelectedItem is not ScriptSource selected)
+            return;
+        var current = game;
+        var known = stepText;
+        var loaded = await Run($"Reading {selected.Name}...",
+            () => (Script: Script.Load(current, selected), Text: known ?? StepText.For(current, GameText.English)));
+        if (loaded.Script is null)
+            return;
+        script = loaded.Script;
+        stepText = loaded.Text;
+        ShowSteps();
+        Status.Text = $"{selected.Folder} / {selected.Name}";
+    }
+
+    void ScriptViewChanged(object sender, RoutedEventArgs e) => ShowSteps();
+
+    // The story view tells each step in a sentence and leaves staging out unless asked; the technical view shows every step raw.
+    void ShowSteps()
+    {
+        if (script is null || stepText is null)
+            return;
+        var technical = TechnicalBox.IsChecked == true;
+        var sentences = stepText.Describe(script);
+        bool Shown(ScriptStep step) => technical || StagingBox.IsChecked == true || !sentences[step.Id].Staging;
+        var shown = script.Steps.Where(Shown).ToList();
+        // Shown steps are numbered 1, 2, 3 as listed, so "then" points at a row that's on screen.
+        var numbers = shown.Select((s, i) => (s.Id, i + 1)).ToDictionary();
+        int Number(ScriptStep step) => technical ? step.Number : numbers[step.Id];
+        var cutscenes = shown.Where(s => s.Kind.Contains("LevelSequence")).ToList();
+        var eventLines = technical || cutscenes.Count == 0 ? [] : stepText.EventLines(script);
+        var rows = new List<StepRow>();
+        foreach (var s in shown)
+        {
+            rows.Add(new StepRow(Number(s).ToString(), sentences[s.Id].Text, script.Then(s, Shown, Number), Script.KindName(s.Kind),
+                Script.Settings(s), script.Leads(s), s.Id));
+            // With one cutscene the event's lines are its dialogue; with several there's no telling which says what.
+            if (cutscenes is [var only] && only == s)
+                rows.AddRange(eventLines.Select(line => new StepRow("", "      " + line, "", "", "", "", "")));
+        }
+        StepGrid.ItemsSource = rows;
+        foreach (var column in new[] { WhatColumn, ThenColumn })
+            column.Visibility = technical ? Visibility.Collapsed : Visibility.Visible;
+        foreach (var column in new[] { KindColumn, SettingsColumn, LeadsColumn, IdColumn })
+            column.Visibility = technical ? Visibility.Visible : Visibility.Collapsed;
+        ScriptInfo.Text = (shown.Count == script.Steps.Count
+            ? $"{script.Source.Package}: {script.Steps.Count} steps."
+            : $"{script.Source.Package}: {shown.Count} of {script.Steps.Count} steps; the rest only stage the scene.")
+            + (cutscenes.Count > 1 && eventLines.Count > 0 ? $" Its {cutscenes.Count} cutscenes share {eventLines.Count} lines of dialogue." : "");
+    }
+
+    void CopyStepId(object sender, RoutedEventArgs e)
+    {
+        if (StepGrid.SelectedItem is StepRow row)
+        {
+            Clipboard.SetText(row.Id);
+            Status.Text = $"Copied the id of step {row.Number}.";
+        }
+    }
+
+    void ScriptSearchChanged(object sender, TextChangedEventArgs e)
+    {
+        if (ScriptList.ItemsSource is not ListCollectionView view)
+            return;
+        var find = ScriptSearchBox.Text.Trim();
+        view.Filter = find.Length == 0
+            ? null
+            : item => item is ScriptSource s && (s.Folder + "/" + s.Name).Contains(find, StringComparison.OrdinalIgnoreCase);
     }
 
     static DataGridTextColumn Column(string header, int index)

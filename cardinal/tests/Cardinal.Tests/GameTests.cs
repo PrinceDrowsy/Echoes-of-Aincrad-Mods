@@ -1,4 +1,5 @@
 using Cardinal.Maps;
+using Cardinal.Scripts;
 using Cardinal.Tables;
 using Cardinal.Text;
 using Newtonsoft.Json.Linq;
@@ -73,5 +74,23 @@ public class GameTests(GameFixture fixture)
         Assert.Contains(map.Layers, l => !l.Developer && l.CellCount > 0);
         Assert.NotEmpty(map.LoadMarkers(game, "Measurements"));
         Assert.Contains(FloorMap.Load(game, "WL01").Layers, l => l.Name == "GimmickTools" && l.CellCount > 0);
+    }
+
+    [Fact]
+    public void ScriptsReadInStoryOrder()
+    {
+        var game = fixture.Require();
+        var scripts = Script.List(game);
+        Assert.True(scripts.Count >= 500, $"only {scripts.Count} scripts");
+        var guard = scripts.Single(s => s.Name == "Flow_pev_01_01_17");
+        Assert.Equal("/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17", guard.Package);
+
+        var script = Script.Load(game, guard);
+        Assert.Equal(["Start", "Talk (Blueprint)", "RODTimer", "ShowTutorialWindow", "Finish"],
+            script.Steps.Take(5).Select(s => Script.KindName(s.Kind)));
+        var window = script.Steps[3];
+        Assert.Equal("2DB3554C-4DB8679E-01354D89-95299F90", window.Id);
+        Assert.Equal("TutorialCategory ETutorialCategory::Operation; TutorialID 13", Script.Settings(window));
+        Assert.Equal("Completed → 5 Finish", script.Leads(window));
     }
 }

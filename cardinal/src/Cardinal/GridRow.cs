@@ -72,3 +72,5 @@ sealed record InstalledRow(string Name, int Files, int Conflicts, int Unused);
 sealed record ConflictRow(string Asset, string Outcome);
 
 sealed record CultureItem(string Code, string Name);
+
+sealed record StepRow(string Number, string Text, string Then, string Kind, string Settings, string Leads, string Id);
