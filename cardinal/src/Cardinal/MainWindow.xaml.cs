@@ -69,7 +69,7 @@ public partial class MainWindow : Window
         OodleBox.Text = settings.OodleFile ?? "";
         choosingLanguage = true;
         LanguageBox.ItemsSource = GameText.Shipped.Append(settings.TextLanguage).Distinct()
-            .Select(c => new CultureItem(c, GameText.Name(c))).ToList();
+            .Select(c => new CultureItem(c, GameText.NativeName(c))).ToList();
         LanguageBox.SelectedIndex = GameText.Shipped.Append(settings.TextLanguage).Distinct().ToList().IndexOf(settings.TextLanguage);
         choosingLanguage = false;
         Map.Hover += text => Status.Text = text;
@@ -178,7 +178,7 @@ public partial class MainWindow : Window
         stepText = null;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
-        var cultures = opened.Cultures.Select(c => new CultureItem(c, GameText.Name(c))).ToList();
+        var cultures = opened.Cultures.Select(c => new CultureItem(c, GameText.NativeName(c))).ToList();
         CultureBox.ItemsSource = cultures;
         CultureBox.SelectedIndex = opened.Cultures.ToList().FindIndex(c => c == game.Language);
         choosingLanguage = true;

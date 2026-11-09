@@ -51,4 +51,24 @@ public static class GameText
             return culture;
         }
     }
+
+    /// <summary>
+    /// A culture's name in its own language, like "日本語 (日本)" or "Français", for language pickers: someone looking for
+    /// their language knows it by its own name. Unknown codes are shown as they are.
+    /// </summary>
+    public static string NativeName(string culture)
+    {
+        try
+        {
+            var info = CultureInfo.GetCultureInfo(culture);
+            if (info.EnglishName.StartsWith("Unknown", StringComparison.Ordinal))
+                return culture;
+            var name = info.NativeName;
+            return $"{char.ToUpper(name[0], info)}{name[1..]} ({culture})";
+        }
+        catch (CultureNotFoundException)
+        {
+            return culture;
+        }
+    }
 }
