@@ -38,15 +38,39 @@ public sealed partial class StepText(Game game, Locres language)
     ];
 
     /// <summary>
-    /// Every step of the script told in a sentence, by step id. Cast members show as their number unless names is set,
-    /// since a scene often calls someone by a title ("Fencer") before the story says who they are.
+    /// Every step of the script told in a sentence, by step id. A scene often calls someone by a title ("Fencer") before
+    /// the story says who they are, so unless names is set a cast member shows as their number until the subtitles first
+    /// show their name as a speaker, and by name from that step on.
     /// </summary>
-    public IReadOnlyDictionary<string, StepSentence> Describe(Script script, bool names) =>
-        script.Steps.ToDictionary(s => s.Id, s => Describe(s, names));
-
-    StepSentence Describe(ScriptStep step, bool names)
+    public IReadOnlyDictionary<string, StepSentence> Describe(Script script, bool names)
     {
-        string Character(string id) => names && Name(id) is { } name ? $"{name} ({id})" : $"character {id}";
+        var named = NamedAt(script);
+        return script.Steps.Select((s, i) => (s, i)).ToDictionary(p => p.s.Id, p => Describe(p.s, id =>
+            Name(id) is { } name && (names || named.TryGetValue(name, out var at) && p.i >= at) ? $"{name} ({id})" : $"character {id}"));
+    }
+
+    // Where, in story order, each name first appears as a speaker in the subtitles. A cutscene's lines come from the
+    // event's text, which can't be split between several cutscenes, so they count from the last one.
+    Dictionary<string, int> NamedAt(Script script)
+    {
+        var named = new Dictionary<string, int>();
+        var lastCutscene = script.Steps.ToList().FindLastIndex(s => s.Kind.Contains("LevelSequence"));
+        if (lastCutscene >= 0)
+            foreach (var line in EventLines(script))
+                if (Speaker(line) is { } speaker)
+                    named.TryAdd(speaker, lastCutscene);
+        for (var i = 0; i < script.Steps.Count; i++)
+            if (Script.KindName(script.Steps[i].Kind) == "Talk (Blueprint)" && Speaker(Line((string?)script.Steps[i].Fields["TextID"])) is { } speaker)
+                named[speaker] = Math.Min(named.GetValueOrDefault(speaker, i), i);
+        return named;
+    }
+
+    // The speaker label a line of dialogue starts with, as in "Stella: ...". A name only mentioned in a line doesn't count.
+    static string? Speaker(string? line) =>
+        line?.IndexOf(':') is > 0 and < 40 and var colon && !line[..colon].Contains('\n') ? line[..colon].Trim() : null;
+
+    StepSentence Describe(ScriptStep step, Func<string, string> Character)
+    {
         var kind = Script.KindName(step.Kind);
         var f = step.Fields;
         string Who(JToken? target) => (Enum(target?["Target"]), (string?)target?["ID"]) switch
