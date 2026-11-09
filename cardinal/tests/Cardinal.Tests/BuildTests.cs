@@ -128,6 +128,42 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
     }
 
     [Fact]
+    public void AFlowStepCanBecomeAnotherKind()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        // Guard's tutorial window in the beta, turned into the quiet tutorial step the game uses elsewhere.
+        const string graph = "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17";
+        const string step = "2DB3554C-4DB8679E-01354D89-95299F90";
+        NodeChange Change(string kind, Dictionary<string, string> fields) =>
+            new(graph, step, kind, fields, new() { ["Completed"] = "Out" });
+
+        var wrong = new ModProject { Name = "Wrong" };
+        wrong.SetNode(Change("FlowNode_Nothing", []));
+        wrong.SetNode(Change("FlowNode_TutorialGuide", []) with { Node = "00000000-00000000-00000000-00000000" });
+        wrong.SetNode(Change("FlowNode_TutorialGuide", new() { ["bLoud"] = "true" }) with { Asset = graph.Replace("17", "16") + "x" });
+        Assert.Equal(3, ModBuilder.Check(game, fixture.Settings, wrong).Count(p => p.Blocks));
+
+        var project = new ModProject { Name = "Quiet" };
+        project.SetNode(Change("FlowNode_TutorialGuide", new() { ["bShow"] = "true", ["bShowInfoMessage"] = "true" }));
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+
+        using var modded = Game.Open(fixture.Settings, true);
+        var node = modded.Provider.LoadPackage(Cardinal.Mods.AssetCopier.File(graph)).GetExports()
+            .Single(e => JObject.FromObject(e.Properties.ToDictionary(p => p.Name.Text, p => p.Tag?.GenericValue))["NodeGuid"]?.ToString() == step);
+        Assert.Equal("FlowNode_TutorialGuide", node.ExportType);
+        var fields = JObject.FromObject(node.Properties.ToDictionary(p => p.Name.Text, p => p.Tag?.GenericValue));
+        Assert.Equal("ETutorialCategory::Operation", (string?)fields["TutorialCategory"]);
+        Assert.Equal(13, (int?)fields["TutorialID"]);
+        Assert.True((bool?)fields["bShow"]);
+        Assert.True((bool?)fields["bShowInfoMessage"]);
+        var next = Assert.Single(fields["Connections"]!);
+        Assert.Equal("Out", (string?)next["Key"]);
+        Assert.Equal("FA92D775-47096F42-36F68683-723CA16C", (string?)next["Value"]!["NodeGuid"]);
+    }
+
+    [Fact]
     public void ModsAtOnePriorityTieUntilMerged()
     {
         var game = fixture.Require();

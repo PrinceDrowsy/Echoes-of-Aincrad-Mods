@@ -1,7 +1,8 @@
 namespace Cardinal.Mods;
 
 /// <summary>
-/// Two or more merged mods setting the same value or line of text differently, or adding the same row. The last one listed wins.
+/// Two or more merged mods setting the same value or line of text differently, or adding the same row or changing the same
+/// Flow step. The last one listed wins.
 /// </summary>
 public sealed record MergeClash(string Change, IReadOnlyList<(string Mod, string Value)> Values)
 {
@@ -57,6 +58,12 @@ public static class ModMerge
             {
                 Add(rows, "new asset " + copy.Label, project.Name, $"copy of {copy.From}");
                 merged.SetAsset(copy);
+            }
+            // Like a new row, a step changed by two mods is the one each expects, so that's always a clash.
+            foreach (var change in project.NodeChanges)
+            {
+                Add(rows, "step " + change.Label, project.Name, change.Kind + string.Concat(change.Fields.Select(f => $", {f.Key} {f.Value}")));
+                merged.SetNode(change);
             }
             foreach (var added in project.AddedText)
             {

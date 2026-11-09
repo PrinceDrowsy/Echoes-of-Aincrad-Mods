@@ -154,16 +154,19 @@ The export shows the table's rows and columns as CSV and JSON, so the row key an
 
 ## Mod projects
 
-A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 4. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, and version 4 `addedAssets`. Older files open unchanged, and are saved as version 4.
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 5. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, version 4 `addedAssets`, and version 5 `nodeChanges`. Older files open unchanged, and are saved as version 5.
 
 ```json
-{ "formatVersion": 4, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
+{ "formatVersion": 5, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
   "edits": [ { "table": "Skills/DT_ActiveSkillList", "row": "0", "field": "CoolTime", "value": "2.5", "original": "5" } ],
   "textEdits": [ { "culture": "en", "namespace": "ST_DatabaseLocalizeList", "key": "...", "value": "New text", "original": "Old text" } ],
   "addedRows": [ { "table": "Items/UseItem", "key": "75", "from": "1",
                    "fields": { "ID": "75", "ItemKey": "ItemName_Usable_75", "DescriptionKey": "ItemDescription_Usable_75" } } ],
   "addedText": [ { "namespace": "ST_GeneralLocalizeList", "key": "ItemName_Usable_75", "text": { "en": "My Item", "ja-JP": "..." } } ],
-  "addedAssets": [ { "from": "/Game/ROD/DataAssets/Town/Town_004", "package": "/Game/ROD/DataAssets/Town/Town_011" } ] }
+  "addedAssets": [ { "from": "/Game/ROD/DataAssets/Town/Town_004", "package": "/Game/ROD/DataAssets/Town/Town_011" } ],
+  "nodeChanges": [ { "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17",
+                     "node": "2DB3554C-4DB8679E-01354D89-95299F90", "kind": "FlowNode_TutorialGuide",
+                     "fields": { "bShow": "true", "bShowInfoMessage": "true" }, "outputs": { "Completed": "Out" } } ] }
 ```
 
 - `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
@@ -173,6 +176,7 @@ A project is a small JSON file holding only the changes. Field names are stable 
 - `addedRows`: a new row in `table` with the key `key`. It starts as a copy of the game's row `from` in the same table, and `fields` replaces single values of the copy by column name. A field the copied row leaves at its default can't be set yet. Rows are added before `edits` apply, so the copy is always of the game's own row.
 - `addedAssets`: a copy of the game asset `from` as the new asset `package`, both `/Game` paths. The last part of `package` is the copy's name: letters, digits and underscores.
 - `addedText`: a new key in `namespace`, which must be `ST_GeneralLocalizeList`, the game's main string table. `text` holds a line per culture and must have `en`, which goes in the string table itself: every language without its own line shows it, as the game does for its own untranslated lines.
+- `nodeChanges`: a step of a Flow graph, the game's scripts for story events, quests and tutorials, turned into another kind of step. `asset` is the graph's `/Game` path and `node` the step's `NodeGuid`, as FModel shows it. `kind` is the new step's class. Fields the old and new kinds share keep their values, the old kind's others are dropped, and `fields` sets the new kind's own: true or false, whole numbers, numbers, names, text and enum values so far. `outputs` renames the step's connected outputs, old name to new, so it still leads to the same next steps; each kind names its outputs in its C++ class, so check another step of the new kind for them. Steps made in Blueprint, like conversations, can't be changed yet, though graphs that contain them can.
 - `priority`: 1 to 9998, default 1000 when missing. The built files are named after `name` (letters, digits, dashes and underscores) plus `_<priority>_P`, so `FasterRecovery_1000_P`. Any priority makes the mod outrank the game's own patch; see [Mods that change the same files](#mods-that-change-the-same-files).
 
 ## Export formats

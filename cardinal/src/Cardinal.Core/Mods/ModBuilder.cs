@@ -19,6 +19,8 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(AssetCopy copy, string problem) : this($"new asset {copy.Label}", problem, true) { }
 
+    public EditProblem(NodeChange change, string problem) : this($"step {change.Label}", problem, true) { }
+
     public override string ToString() => $"{Change}: {Problem}";
 }
 
@@ -132,7 +134,7 @@ public static class ModBuilder
                 if (AssetCopier.Check(game, registry, copy) is { } problem)
                     problems.Add(new EditProblem(copy, problem));
         }
-        if (project.Edits.Count + project.AddedRows.Count + project.AddedText.Count == 0)
+        if (project.Edits.Count + project.AddedRows.Count + project.AddedText.Count + project.NodeChanges.Count == 0)
             return (plan, problems);
 
         var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
@@ -176,6 +178,21 @@ public static class ModBuilder
                 problems.Add(new EditProblem(edit, problem, true));
             else
                 plan.Steps.Add(() => asset.Apply(target, edit));
+        }
+
+        foreach (var change in project.NodeChanges)
+        {
+            var file = change.Asset.StartsWith("/Game/") ? AssetCopier.File(change.Asset) : null;
+            if (file is null || !game.Provider.Files.ContainsKey(file))
+            {
+                problems.Add(new EditProblem(change, "no such asset. Write it as a /Game path, as in /Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Chest."));
+                continue;
+            }
+            var asset = Asset(file);
+            if (asset.Check(change) is { } problem)
+                problems.Add(new EditProblem(change, problem));
+            else
+                plan.Steps.Add(() => asset.Apply(change));
         }
 
         foreach (var text in project.AddedText)

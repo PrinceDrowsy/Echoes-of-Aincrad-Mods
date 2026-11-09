@@ -15,14 +15,14 @@ namespace Cardinal.Mods;
 /// </summary>
 public sealed class EditableAsset
 {
-    readonly UAsset? asset;
+    readonly UAsset asset;
 
     /// <summary>Why this asset can't be edited, or null when it can.</summary>
     public string? Problem { get; }
 
     public string File { get; }
 
-    EditableAsset(string file, UAsset? asset, string? problem)
+    EditableAsset(string file, UAsset asset, string? problem)
     {
         File = file;
         this.asset = asset;
@@ -37,12 +37,13 @@ public sealed class EditableAsset
         {
             var path = Retoc.Extract(settings, file, work);
             var asset = new UAsset(path, EngineVersion.VER_UE5_3, mappings);
+            // An export UAssetAPI can't decode is written back byte for byte, so it only blocks changes made inside it.
+            // Flow graphs often have Blueprint steps the mappings don't describe; Change checks its own step instead.
             var raw = asset.Exports.OfType<RawExport>().FirstOrDefault();
-            return raw is null
-                ? new EditableAsset(file, asset, null)
-                : new EditableAsset(file, null,
-                    $"Cardinal can't decode {Path.GetFileName(file)} with the current mappings, so it's read-only. " +
-                    "Mappings made for your exact game version (Cardinal Mappings writes them) may fix this.");
+            return new EditableAsset(file, asset, raw is null
+                ? null
+                : $"Cardinal can't decode {Path.GetFileName(file)} with the current mappings, so it's read-only. " +
+                  "Mappings made for your exact game version (Cardinal Mappings writes them) may fix this.");
         }
         finally
         {
@@ -76,13 +77,13 @@ public sealed class EditableAsset
     public void Write(string path)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        asset!.Write(path);
+        asset.Write(path);
     }
 
     void Set(EditTarget target, ModEdit edit, bool commit)
     {
-        if (asset is null)
-            throw new EditException(Problem!);
+        if (Problem is not null)
+            throw new EditException(Problem);
         SetField(RowFields(target, edit.Row), edit.Field, edit.Value, commit);
     }
 
@@ -122,8 +123,8 @@ public sealed class EditableAsset
     // The new row is a deep copy of From with its own key, so every field the game leaves at its default stays that way too.
     void Add(EditTarget target, RowAddition row, bool commit)
     {
-        if (asset is null)
-            throw new EditException(Problem!);
+        if (Problem is not null)
+            throw new EditException(Problem);
         if (target.Map is null)
         {
             var rows = DataTable().Table.Data;
@@ -168,16 +169,136 @@ public sealed class EditableAsset
         table.Add(new FString(key), new FString(english));
     }
 
+    /// <summary>Checks that a Flow step can be changed as asked without changing anything. Returns why not, or null.</summary>
+    public string? Check(NodeChange change)
+    {
+        try
+        {
+            Change(change, false);
+            return null;
+        }
+        catch (EditException e)
+        {
+            return e.Message;
+        }
+    }
+
+    public void Apply(NodeChange change) => Change(change, true);
+
+    // The step stays the same export, so the graph's map of steps and every connection into it still find it.
+    void Change(NodeChange change, bool commit)
+    {
+        var guid = UnrealGuid(change.Node);
+        var node = asset.Exports.OfType<NormalExport>().FirstOrDefault(e => NodeGuid(e) == guid)
+                   ?? throw new EditException(asset.Exports.OfType<RawExport>().Any()
+                       ? $"There's no step {change.Node} that Cardinal can read in {Path.GetFileName(File)}. Steps made in Blueprint, like conversations, can't be changed yet."
+                       : $"There's no step {change.Node} in {Path.GetFileName(File)}.");
+        var oldClass = Import(node.ClassIndex);
+        var schema = Schema(change.Kind);
+        if (!Lineage(schema).Any(s => s.Name == "FlowNode"))
+            throw new EditException($"{change.Kind} isn't a kind of Flow step.");
+        var fields = Lineage(schema).SelectMany(s => s.Properties.Values).ToDictionary(p => p.Name);
+
+        var kept = node.Data.Where(p => fields.TryGetValue(p.Name.ToString(), out var field)
+                                        && field.PropertyData.Type.ToString() == p.PropertyType.ToString()).ToList();
+        foreach (var (name, text) in change.Fields)
+        {
+            var property = kept.FirstOrDefault(p => p.Name.ToString() == name);
+            if (property is null)
+            {
+                property = NewProperty(fields.GetValueOrDefault(name)
+                                       ?? throw new EditException($"{change.Kind} has no field {name}."));
+                kept.Add(property);
+            }
+            SetValue(property, text, true);
+        }
+
+        var connections = kept.OfType<MapPropertyData>().FirstOrDefault(m => m.Name.ToString() == "Connections");
+        var renamed = new List<(NamePropertyData Pin, string To)>();
+        foreach (var (from, to) in change.Outputs)
+        {
+            var pin = connections?.Value.Keys.OfType<NamePropertyData>().FirstOrDefault(k => k.Value.ToString() == from)
+                      ?? throw new EditException($"Step {change.Node} has no connected output {from}.");
+            renamed.Add((pin, to));
+        }
+        if (!commit)
+            return;
+
+        foreach (var (pin, to) in renamed)
+            pin.Value = Name(to);
+        node.Data = kept;
+        // The new kind comes from the same script package as the old one, as Flow steps in one game module do.
+        var package = oldClass.OuterIndex;
+        node.ClassIndex = FindOrAddImport("/Script/CoreUObject", "Class", package, change.Kind);
+        node.TemplateIndex = FindOrAddImport(Import(package).ObjectName.ToString(), change.Kind, package, "Default__" + change.Kind);
+    }
+
+    // Projects write a step's NodeGuid the way the game's tools show it: four hex numbers, as in 3FC7D895-4BFD1ED9-8EF446A4-A5C5CCEA.
+    static Guid UnrealGuid(string text)
+    {
+        var parts = text.Split('-');
+        if (parts.Length != 4 || !parts.All(p => uint.TryParse(p, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _)))
+            throw new EditException($"{text} isn't a step id, which is written as four hex numbers like 3FC7D895-4BFD1ED9-8EF446A4-A5C5CCEA.");
+        var bytes = parts.SelectMany(p => BitConverter.GetBytes(uint.Parse(p, NumberStyles.HexNumber, CultureInfo.InvariantCulture))).ToArray();
+        return new Guid(bytes);
+    }
+
+    static Guid? NodeGuid(NormalExport export) =>
+        export.Data.FirstOrDefault(p => p.Name.ToString() == "NodeGuid") is StructPropertyData { Value: [GuidPropertyData id] }
+            ? id.Value
+            : null;
+
+    Import Import(FPackageIndex index) =>
+        index.IsImport() ? index.ToImport(asset) : throw new EditException("That step's kind isn't one Cardinal can change.");
+
+    UsmapSchema Schema(string name) =>
+        asset.Mappings.Schemas.TryGetValue(name, out var schema)
+            ? schema
+            : throw new EditException($"The game has no kind of step called {name}.");
+
+    IEnumerable<UsmapSchema> Lineage(UsmapSchema schema)
+    {
+        for (var s = schema; s is not null; s = s.SuperType is not null && asset.Mappings.Schemas.TryGetValue(s.SuperType, out var super) ? super : null)
+            yield return s;
+    }
+
+    PropertyData NewProperty(UsmapProperty field)
+    {
+        var name = Name(field.Name);
+        return field.PropertyData switch
+        {
+            { Type: EPropertyType.BoolProperty } => new BoolPropertyData(name),
+            { Type: EPropertyType.IntProperty } => new IntPropertyData(name),
+            { Type: EPropertyType.FloatProperty } => new FloatPropertyData(name),
+            { Type: EPropertyType.NameProperty } => new NamePropertyData(name),
+            { Type: EPropertyType.StrProperty } => new StrPropertyData(name),
+            UsmapEnumData e => new EnumPropertyData(name) { EnumType = Name(e.Name) },
+            _ => throw new EditException($"{field.Name} is a {field.PropertyData.Type} field, which Cardinal can't set on a step yet."),
+        };
+    }
+
+    FPackageIndex FindOrAddImport(string classPackage, string className, FPackageIndex outer, string objectName)
+    {
+        for (var i = 0; i < asset.Imports.Count; i++)
+        {
+            var import = asset.Imports[i];
+            if (import.ClassPackage.ToString() == classPackage && import.ClassName.ToString() == className
+                && import.OuterIndex.Index == outer.Index && import.ObjectName.ToString() == objectName)
+                return FPackageIndex.FromImport(i);
+        }
+        return asset.AddImport(new Import(Name(classPackage), Name(className), outer, Name(objectName), false));
+    }
+
     FStringTable StringTable() =>
-        asset?.Exports.OfType<StringTableExport>().FirstOrDefault()?.Table
+        (Problem is null ? asset.Exports.OfType<StringTableExport>().FirstOrDefault()?.Table : null)
         ?? throw new EditException(Problem ?? $"{Path.GetFileName(File)} isn't a string table.");
 
     DataTableExport DataTable() =>
-        asset!.Exports.OfType<DataTableExport>().FirstOrDefault()
+        asset.Exports.OfType<DataTableExport>().FirstOrDefault()
         ?? throw new EditException($"{Path.GetFileName(File)} isn't a data table.");
 
     MapPropertyData Map(EditTarget target) =>
-        asset!.Exports.OfType<NormalExport>().SelectMany(e => e.Data).OfType<MapPropertyData>()
+        asset.Exports.OfType<NormalExport>().SelectMany(e => e.Data).OfType<MapPropertyData>()
             .FirstOrDefault(m => m.Name.ToString() == target.Map)
         ?? throw new EditException($"{target.Map} wasn't found in {Path.GetFileName(File)}.");
 
@@ -264,7 +385,7 @@ public sealed class EditableAsset
 
     FName Name(string text)
     {
-        asset!.AddNameReference(new FString(text));
+        asset.AddNameReference(new FString(text));
         return FName.FromString(asset, text);
     }
 
@@ -274,7 +395,7 @@ public sealed class EditableAsset
         if (string.IsNullOrWhiteSpace(enumType) || enumType == "None")
             return text.Contains("::") ? text : throw Expected("a value written as EType::Value", property);
         var value = text.Contains("::") ? text : $"{enumType}::{text}";
-        if (asset!.Mappings.EnumMap.TryGetValue(enumType, out var known))
+        if (asset.Mappings.EnumMap.TryGetValue(enumType, out var known))
         {
             var allowed = known.Values.Values.Select(v => v.Contains("::") ? v : $"{enumType}::{v}").ToList();
             if (!allowed.Contains(value))
