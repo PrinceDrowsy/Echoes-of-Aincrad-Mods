@@ -1,6 +1,7 @@
 using Cardinal.Mods;
 using Cardinal.Tables;
 using Cardinal.Text;
+using Newtonsoft.Json.Linq;
 using static Cardinal.Tests.GameTests;
 
 namespace Cardinal.Tests;
@@ -99,6 +100,31 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
         Assert.Equal(4, problems.Count(p => p.Blocks));
         Assert.Equal($"{ActiveSkills} / 0 / CoolTime", Assert.Single(problems, p => !p.Blocks).Change);
         Assert.Throws<EditException>(() => ModBuilder.Build(game, fixture.Settings, project, Path.GetTempPath()));
+    }
+
+    [Fact]
+    public void AListCanOnlyBeEmptied()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        const string tutorials = "Other/DT_TutorialUISystemList";
+        JArray Pages(Game from)
+        {
+            var loaded = TableCatalog.Discover(from).Single(s => s.Id == tutorials).Load(from);
+            return Assert.IsType<JArray>(loaded.Field(loaded.Rows.ToList().FindIndex(r => r.Key == "7"), "TutorialWindow"));
+        }
+        Assert.NotEmpty(Pages(game));
+
+        var rejected = new ModProject { Name = "Pages" };
+        rejected.Set(new ModEdit(tutorials, "7", "TutorialWindow", "[{}]"));
+        Assert.True(Assert.Single(ModBuilder.Check(game, fixture.Settings, rejected)).Blocks);
+
+        var project = new ModProject { Name = "Quiet" };
+        project.Set(new ModEdit(tutorials, "7", "TutorialWindow", "[]"));
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+        using var modded = Game.Open(fixture.Settings, true);
+        Assert.Empty(Pages(modded));
     }
 
     [Fact]

@@ -252,6 +252,11 @@ public sealed class EditableAsset
                 var small = byte.TryParse(text, NumberStyles.Integer, invariant, out var b8) ? b8 : throw Expected("a whole number from 0 to 255", property);
                 if (commit) plainByte.Value = small;
                 break;
+            case ArrayPropertyData list:
+                if (text.Trim() != "[]")
+                    throw Expected("[] to empty it, the only change Cardinal can make to a list so far", property);
+                if (commit) list.Value = [];
+                break;
             default:
                 throw new EditException($"{property.Name} is a {property.PropertyType} field, which Cardinal can't edit yet.");
         }

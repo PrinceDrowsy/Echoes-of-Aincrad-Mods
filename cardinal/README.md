@@ -167,7 +167,7 @@ A project is a small JSON file holding only the changes. Field names are stable 
 ```
 
 - `table`: a table id from `list tables`. `row`: the row key. `field`: the column name.
-- `value`: the new value as text. Enum values can be written with or without their type, as `Crystal02` or `EDropGimmick::Crystal02`.
+- `value`: the new value as text. Enum values can be written with or without their type, as `Crystal02` or `EDropGimmick::Crystal02`. A list can be emptied with `[]`, which is the only change Cardinal makes to lists so far.
 - `original`: the unmodded value when the change was made, for reference. Builds don't need it.
 - `textEdits`: `culture` is a code from `list cultures`, `namespace` and `key` identify the line, `value` is the new text and `original` the game's text when the change was made.
 - `addedRows`: a new row in `table` with the key `key`. It starts as a copy of the game's row `from` in the same table, and `fields` replaces single values of the copy by column name. A field the copied row leaves at its default can't be set yet. Rows are added before `edits` apply, so the copy is always of the game's own row.
