@@ -66,7 +66,7 @@
                         <TextBlock FontWeight="Bold" Text="Game text language" />
                         <TextBlock TextWrapping="Wrap" Foreground="Gray">
                             The language Cardinal shows the game's own text in: item names in Tables, dialogue and names in Scripts.
-                            The game's languages are listed once its files are open. Changing it opens them again.
+                            All the game's languages are listed once its files are open. Changing it opens them again.
                         </TextBlock>
                         <ComboBox x:Name="LanguageBox" Margin="0,4,0,16" Width="280" HorizontalAlignment="Left" DisplayMemberPath="Name"
                                   SelectionChanged="LanguageSelected" />

@@ -67,6 +67,11 @@ public partial class MainWindow : Window
         KeyBox.Text = settings.AesKey ?? "";
         MappingsBox.Text = settings.MappingsFile ?? "";
         OodleBox.Text = settings.OodleFile ?? "";
+        // The game's languages are only known once its files are open; until then the box shows the current choice.
+        choosingLanguage = true;
+        LanguageBox.ItemsSource = new[] { new CultureItem(settings.TextLanguage, GameText.Name(settings.TextLanguage)) };
+        LanguageBox.SelectedIndex = 0;
+        choosingLanguage = false;
         Map.Hover += text => Status.Text = text;
         Closing += ConfirmClose;
         Closed += (_, _) => game?.Dispose();
