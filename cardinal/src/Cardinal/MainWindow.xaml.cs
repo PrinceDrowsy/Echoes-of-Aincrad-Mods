@@ -173,8 +173,13 @@ public partial class MainWindow : Window
         stepText = null;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
-        CultureBox.ItemsSource = opened.Cultures.Select(c => new CultureItem(c, GameText.Name(c))).ToList();
-        CultureBox.SelectedIndex = opened.Cultures.ToList().FindIndex(c => c == GameText.English);
+        var cultures = opened.Cultures.Select(c => new CultureItem(c, GameText.Name(c))).ToList();
+        CultureBox.ItemsSource = cultures;
+        CultureBox.SelectedIndex = opened.Cultures.ToList().FindIndex(c => c == game.Language);
+        choosingLanguage = true;
+        LanguageBox.ItemsSource = cultures;
+        LanguageBox.SelectedIndex = CultureBox.SelectedIndex;
+        choosingLanguage = false;
         TablesTab.IsEnabled = ScriptsTab.IsEnabled = TextTab.IsEnabled = MapTab.IsEnabled = ModTab.IsEnabled = MergeTab.IsEnabled = InstalledTab.IsEnabled = true;
         ShowMergeList();
         Status.Text = $"Opened. {opened.Tables.Count} tables, {opened.Scripts.Count} scripts and {opened.Floors.Count} floors found.";
@@ -199,6 +204,16 @@ public partial class MainWindow : Window
         await CheckEditable(selected);
     }
 
+    bool choosingLanguage;
+
+    void LanguageSelected(object sender, SelectionChangedEventArgs e)
+    {
+        if (choosingLanguage || LanguageBox.SelectedItem is not CultureItem selected || selected.Code == settings.TextLanguage)
+            return;
+        settings.TextLanguage = selected.Code;
+        OpenGame(sender, e);
+    }
+
     async void ScriptSelected(object sender, SelectionChangedEventArgs e)
     {
         if (game is null || ScriptList.SelectedItem is not ScriptSource selected)
@@ -206,7 +221,7 @@ public partial class MainWindow : Window
         var current = game;
         var known = stepText;
         var loaded = await Run($"Reading {selected.Name}...",
-            () => (Script: Script.Load(current, selected), Text: known ?? StepText.For(current, GameText.English)));
+            () => (Script: Script.Load(current, selected), Text: known ?? StepText.For(current, current.Language)));
         if (loaded.Script is null)
             return;
         script = loaded.Script;
@@ -223,7 +238,10 @@ public partial class MainWindow : Window
         if (script is null || stepText is null)
             return;
         var technical = TechnicalBox.IsChecked == true;
-        var sentences = stepText.Describe(script, NamesBox.IsChecked == true);
+        // The names switch only changes rows where Cardinal names a character itself, which are staging rows.
+        NamesBox.IsEnabled = StagingBox.IsChecked == true && !technical;
+        stepText.Edits = project.TextEdits.Where(t => t.Culture == game!.Language).ToDictionary(t => t.Key, t => t.Value);
+        var sentences = stepText.Describe(script, NamesBox.IsChecked == true && NamesBox.IsEnabled);
         bool Shown(ScriptStep step) => technical || StagingBox.IsChecked == true || !sentences[step.Id].Staging;
         var shown = script.Steps.Where(Shown).ToList();
         // Shown steps are numbered 1, 2, 3 as listed, so "then" points at a row that's on screen.
@@ -234,11 +252,13 @@ public partial class MainWindow : Window
         var rows = new List<StepRow>();
         foreach (var s in shown)
         {
-            rows.Add(new StepRow(Number(s).ToString(), sentences[s.Id].Text, script.Then(s, Shown, Number), Script.KindName(s.Kind),
-                Script.Settings(s), script.Leads(s), s.Id));
+            var sentence = sentences[s.Id];
+            rows.Add(new StepRow(Number(s).ToString(), OneLine(sentence.Text), script.Then(s, Shown, Number), Script.KindName(s.Kind),
+                Script.Settings(s), script.Leads(s), s.Id, sentence.TextKey, Edited(sentence.TextKey)));
             // With one cutscene the event's lines are its dialogue; with several there's no telling which says what.
             if (cutscenes is [var only] && only == s)
-                rows.AddRange(eventLines.Select(line => new StepRow("", "      " + line, "", "", "", "", "")));
+                rows.AddRange(eventLines.Select(line =>
+                    new StepRow("", "      " + OneLine(line.Text), "", "", "", "", "", line.Key, Edited(line.Key))));
         }
         StepGrid.ItemsSource = rows;
         foreach (var column in new[] { WhatColumn, ThenColumn })
@@ -249,6 +269,30 @@ public partial class MainWindow : Window
             ? $"{script.Source.Package}: {script.Steps.Count} steps."
             : $"{script.Source.Package}: {shown.Count} of {script.Steps.Count} steps; the rest only stage the scene.")
             + (cutscenes.Count > 1 && eventLines.Count > 0 ? $" Its {cutscenes.Count} cutscenes share {eventLines.Count} lines of dialogue." : "");
+    }
+
+    // Subtitles break lines for the screen; in a row they read better as one.
+    static string OneLine(string text) => text.Replace("\r\n", " ").Replace('\n', ' ');
+
+    bool Edited(string? key) => key is not null && project.TextEdits.Any(t => t.Culture == game!.Language && t.Key == key);
+
+    // Dialogue is edited where all text is, so a line changed here and in the Text tab is one change, in every language.
+    void EditLine(object sender, RoutedEventArgs e)
+    {
+        if (StepGrid.SelectedItem is not StepRow { TextKey: { } key })
+        {
+            Status.Text = "Pick a line of dialogue to edit.";
+            return;
+        }
+        TextSearchBox.Text = key;
+        Tabs.SelectedItem = TextTab;
+        Status.Text = $"{key}: double-click its text to change it, then come back to Scripts to see it in the scene.";
+    }
+
+    void TabChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.OriginalSource == Tabs && Tabs.SelectedItem == ScriptsTab)
+            ShowSteps();
     }
 
     void CopyStepId(object sender, RoutedEventArgs e)

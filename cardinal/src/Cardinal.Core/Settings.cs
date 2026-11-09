@@ -11,6 +11,9 @@ public sealed class Settings
     public string? MappingsFile { get; set; }
     public string? OodleFile { get; set; }
 
+    /// <summary>The game language Cardinal shows the game's text in, as a culture code such as en or ja-JP.</summary>
+    public string TextLanguage { get; set; } = Text.GameText.English;
+
     /// <summary>The mod projects to merge, in order: later ones win where two change the same value.</summary>
     public List<string> MergeProjects { get; set; } = [];
 

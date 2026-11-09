@@ -40,6 +40,8 @@ public sealed class GameFixture : IDisposable
                 return;
             }
         settings.PaksFolder = paks;
+        // The checks expect the game's English, whatever language Cardinal is set to show.
+        settings.TextLanguage = Cardinal.Text.GameText.English;
         Settings = settings;
         game = Game.Open(settings);
     }

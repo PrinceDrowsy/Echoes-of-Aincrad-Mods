@@ -25,12 +25,18 @@ public sealed class Game : IDisposable
     // The main string table's keys and their English, which shows wherever a language has no line of its own.
     readonly Dictionary<string, string> sourceText;
     readonly Locres english;
+    readonly Locres language;
 
-    Game(DefaultFileProvider provider, Dictionary<string, string> sourceText, Locres english)
+    /// <summary>The culture Text shows the game's text in: the setting's, or English when the game has no text for it.</summary>
+    public string Language { get; }
+
+    Game(DefaultFileProvider provider, Dictionary<string, string> sourceText, Locres english, Locres language, string culture)
     {
         Provider = provider;
         this.sourceText = sourceText;
         this.english = english;
+        this.language = language;
+        Language = culture;
     }
 
     /// <summary>
@@ -44,7 +50,9 @@ public sealed class Game : IDisposable
             .StringTable.KeysToEntries.ToDictionary(e => e.Key, e => e.Value);
         // Only the copy the game loads. CUE4Parse's LoadLocalization merges every copy, and the game's own can win over a mod's.
         var english = Locres.Read(provider.SaveAsset(GameText.FilePath(GameText.English)));
-        return new Game(provider, source, english);
+        var culture = provider.Files.ContainsKey(GameText.FilePath(settings.TextLanguage)) ? settings.TextLanguage : GameText.English;
+        var language = culture == GameText.English ? english : Locres.Read(provider.SaveAsset(GameText.FilePath(culture)));
+        return new Game(provider, source, english, language, culture);
     }
 
     /// <summary>Mounts the game's containers, and with withMods everything under Paks too, without reading any text.</summary>
@@ -78,9 +86,14 @@ public sealed class Game : IDisposable
         return $"{path}.{Path.GetFileName(path)}";
     }
 
-    /// <summary>English text for one of the game's text keys, such as ItemName_Material_1.</summary>
+    /// <summary>
+    /// The text for one of the game's text keys, such as ItemName_Material_1, in Language. A line that language lacks
+    /// shows in English, as it does in game.
+    /// </summary>
     public string? Text(string? key) =>
-        key is not null && sourceText.TryGetValue(key, out var source) ? english.Get(TextNamespace, key) ?? source : null;
+        key is not null && sourceText.TryGetValue(key, out var source)
+            ? language.Get(TextNamespace, key) ?? english.Get(TextNamespace, key) ?? source
+            : null;
 
     public bool HasText(string key) => sourceText.ContainsKey(key);
 

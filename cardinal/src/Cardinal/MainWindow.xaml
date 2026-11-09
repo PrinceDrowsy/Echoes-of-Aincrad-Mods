@@ -18,7 +18,7 @@
                 <TextBlock x:Name="Status" Text="Set up the game files to begin." />
             </StatusBarItem>
         </StatusBar>
-        <TabControl x:Name="Tabs">
+        <TabControl x:Name="Tabs" SelectionChanged="TabChanged">
 
             <TabItem Header="Setup">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -62,6 +62,14 @@
                             <Button DockPanel.Dock="Right" Content="Download" Margin="4,0,0,0" Padding="8,2" Click="DownloadOodle" />
                             <TextBox x:Name="OodleBox" />
                         </DockPanel>
+
+                        <TextBlock FontWeight="Bold" Text="Game text language" />
+                        <TextBlock TextWrapping="Wrap" Foreground="Gray">
+                            The language Cardinal shows the game's own text in: item names in Tables, dialogue and names in Scripts.
+                            The game's languages are listed once its files are open. Changing it opens them again.
+                        </TextBlock>
+                        <ComboBox x:Name="LanguageBox" Margin="0,4,0,16" Width="280" HorizontalAlignment="Left" DisplayMemberPath="Name"
+                                  SelectionChanged="LanguageSelected" />
 
                         <Button x:Name="OpenButton" Content="Save and open the game files" HorizontalAlignment="Left" Padding="12,4" Click="OpenGame" />
                         <TextBlock x:Name="SetupProblems" TextWrapping="Wrap" Foreground="Firebrick" Margin="0,8,0,0" />
@@ -151,9 +159,20 @@
                                   CanUserAddRows="False" CanUserDeleteRows="False" EnableRowVirtualization="True">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="Edit this line in the Text tab" Click="EditLine" />
                                     <MenuItem Header="Copy step id" Click="CopyStepId" />
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
+                            <DataGrid.RowStyle>
+                                <Style TargetType="DataGridRow">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Edited}" Value="True">
+                                            <Setter Property="Background" Value="#FFEC96" />
+                                            <Setter Property="Foreground" Value="Black" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.RowStyle>
                             <DataGrid.Resources>
                                 <Style x:Key="Wrapped" TargetType="TextBlock">
                                     <Setter Property="TextWrapping" Value="Wrap" />

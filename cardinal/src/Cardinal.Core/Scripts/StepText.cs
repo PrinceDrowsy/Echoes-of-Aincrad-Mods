@@ -8,7 +8,10 @@ namespace Cardinal.Scripts;
 /// A step told in a sentence, for people who don't read the game's classes. Staging is everything that only moves the
 /// camera and the actors (timers, animations, looks, fades); the rest is the story itself: talk, choices, quests, items.
 /// </summary>
-public sealed record StepSentence(string Text, bool Staging);
+public sealed record StepSentence(string Text, bool Staging, string? TextKey = null);
+
+/// <summary>A line of the event's own text, by its key in the game's string tables.</summary>
+public sealed record EventLine(string Key, string Text);
 
 /// <summary>Turns a script's steps into sentences in one language, with dialogue and names looked up in the game's text.</summary>
 public sealed partial class StepText(Game game, Locres language)
@@ -16,6 +19,9 @@ public sealed partial class StepText(Game game, Locres language)
     // Every line of the language by key; event dialogue lives in one string table per event.
     readonly Lazy<Dictionary<string, string>> lines = new(() =>
         language.Lines.GroupBy(l => l.Key).ToDictionary(g => g.Key, g => g.First().Text));
+
+    /// <summary>A mod project's own text for this language by key, shown in place of the game's.</summary>
+    public IReadOnlyDictionary<string, string> Edits { get; set; } = new Dictionary<string, string>();
 
     static readonly HashSet<string> StagingKinds =
     [
@@ -57,7 +63,7 @@ public sealed partial class StepText(Game game, Locres language)
         var lastCutscene = script.Steps.ToList().FindLastIndex(s => s.Kind.Contains("LevelSequence"));
         if (lastCutscene >= 0)
             foreach (var line in EventLines(script))
-                if (Speaker(line) is { } speaker)
+                if (Speaker(line.Text) is { } speaker)
                     named.TryAdd(speaker, lastCutscene);
         for (var i = 0; i < script.Steps.Count; i++)
             if (Script.KindName(script.Steps[i].Kind) == "Talk (Blueprint)" && Speaker(Line((string?)script.Steps[i].Fields["TextID"])) is { } speaker)
@@ -138,7 +144,8 @@ public sealed partial class StepText(Game game, Locres language)
         };
         if (!step.Reachable)
             text = $"(Nothing in this script leads here.) {text}";
-        return new StepSentence(text ?? $"{kind}: {Script.Settings(step)}", StagingKinds.Contains(kind));
+        var key = kind is "Talk (Blueprint)" or "TalkChat" ? (string?)f["TextID"] : null;
+        return new StepSentence(text ?? $"{kind}: {Script.Settings(step)}", StagingKinds.Contains(kind), key);
     }
 
     readonly Dictionary<string, string?> characters = [];
@@ -169,19 +176,22 @@ public sealed partial class StepText(Game game, Locres language)
     /// The lines in the script's own event text, in their numbered order. A cutscene's dialogue lives in its sequence,
     /// not in the script, but its lines are in the event's string table under the script's name (Main_cev_09_02_01_...).
     /// </summary>
-    public IReadOnlyList<string> EventLines(Script script)
+    public IReadOnlyList<EventLine> EventLines(Script script)
     {
         var prefix = "Main_" + script.Source.Name.Replace("Flow_", "") + "_";
         return lines.Value.Keys.Where(k => k.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             .Order(StringComparer.OrdinalIgnoreCase)
-            .Select(k => Line(k)!)
+            .Select(k => new EventLine(k, Line(k)!))
             .ToList();
     }
 
-    /// <summary>A line of the game's text with its {Rep_...} names filled in, as the game does when it shows it.</summary>
+    /// <summary>
+    /// A line of the game's text, or the project's own where it changes it, with its {Rep_...} names filled in as the game
+    /// does when it shows it.
+    /// </summary>
     public string? Line(string? key)
     {
-        if (key is null || !lines.Value.TryGetValue(key, out var text))
+        if (key is null || !(Edits.TryGetValue(key, out var text) || lines.Value.TryGetValue(key, out text)))
             return null;
         return Replacement().Replace(text, m => lines.Value.GetValueOrDefault(m.Groups[1].Value) ?? m.Value);
     }

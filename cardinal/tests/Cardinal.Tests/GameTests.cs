@@ -93,4 +93,27 @@ public class GameTests(GameFixture fixture)
         Assert.Equal("TutorialCategory ETutorialCategory::Operation; TutorialID 13", Script.Settings(window));
         Assert.Equal("Completed → 5 Finish", script.Leads(window));
     }
+
+    [Fact]
+    public void GameTextShowsInTheChosenLanguage()
+    {
+        var game = fixture.Require();
+        var english = game.Text("PartnerName_ARG");
+        Settings With(string language)
+        {
+            var settings = System.Text.Json.JsonSerializer.Deserialize<Settings>(System.Text.Json.JsonSerializer.Serialize(fixture.Settings))!;
+            settings.TextLanguage = language;
+            return settings;
+        }
+
+        using (var japanese = Game.Open(With("ja-JP")))
+        {
+            Assert.Equal("ja-JP", japanese.Language);
+            Assert.NotEqual(english, japanese.Text("PartnerName_ARG"));
+            Assert.Equal(GameText.Load(game, "ja-JP").Get(Game.TextNamespace, "PartnerName_ARG"), japanese.Text("PartnerName_ARG"));
+        }
+        using var unknown = Game.Open(With("xx-XX"));
+        Assert.Equal(GameText.English, unknown.Language);
+        Assert.Equal(english, unknown.Text("PartnerName_ARG"));
+    }
 }

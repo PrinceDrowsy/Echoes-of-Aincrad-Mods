@@ -73,4 +73,5 @@ sealed record ConflictRow(string Asset, string Outcome);
 
 sealed record CultureItem(string Code, string Name);
 
-sealed record StepRow(string Number, string Text, string Then, string Kind, string Settings, string Leads, string Id);
+sealed record StepRow(string Number, string Text, string Then, string Kind, string Settings, string Leads, string Id,
+    string? TextKey = null, bool Edited = false);
