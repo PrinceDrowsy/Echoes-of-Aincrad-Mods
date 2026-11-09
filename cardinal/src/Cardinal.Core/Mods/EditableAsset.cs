@@ -193,27 +193,16 @@ public sealed class EditableAsset
                    ?? throw new EditException(asset.Exports.OfType<RawExport>().Any()
                        ? $"There's no step {change.Node} that Cardinal can read in {Path.GetFileName(File)}. Steps made in Blueprint, like conversations, can't be changed yet."
                        : $"There's no step {change.Node} in {Path.GetFileName(File)}.");
-        var oldClass = Import(node.ClassIndex);
-        var schema = Schema(change.Kind);
-        if (!Lineage(schema).Any(s => s.Name == "FlowNode"))
-            throw new EditException($"{change.Kind} isn't a kind of Flow step.");
-        var fields = Lineage(schema).SelectMany(s => s.Properties.Values).ToDictionary(p => p.Name);
+        var kind = change.Kind ?? Import(node.ClassIndex).ObjectName.ToString();
+        var fields = StepFields(kind);
 
-        var kept = node.Data.Where(p => fields.TryGetValue(p.Name.ToString(), out var field)
-                                        && field.PropertyData.Type.ToString() == p.PropertyType.ToString()).ToList();
-        foreach (var (name, text) in change.Fields)
-        {
-            var property = kept.FirstOrDefault(p => p.Name.ToString() == name);
-            if (property is null)
-            {
-                property = NewProperty(fields.GetValueOrDefault(name)
-                                       ?? throw new EditException($"{change.Kind} has no field {name}."));
-                kept.Add(property);
-            }
-            SetValue(property, text, true);
-        }
+        var kept = change.Kind is null
+            ? node.Data.ToList()
+            : node.Data.Where(p => fields.TryGetValue(p.Name.ToString(), out var field)
+                                   && field.PropertyData.Type.ToString() == p.PropertyType.ToString()).ToList();
+        SetFields(kept, kind, fields, change.Fields, commit);
 
-        var connections = kept.OfType<MapPropertyData>().FirstOrDefault(m => m.Name.ToString() == "Connections");
+        var connections = Connections(kept);
         var renamed = new List<(NamePropertyData Pin, string To)>();
         foreach (var (from, to) in change.Outputs)
         {
@@ -221,17 +210,217 @@ public sealed class EditableAsset
                       ?? throw new EditException($"Step {change.Node} has no connected output {from}.");
             renamed.Add((pin, to));
         }
+        var links = Targets(change.Links);
         if (!commit)
             return;
 
         foreach (var (pin, to) in renamed)
             pin.Value = Name(to);
+        Link(kept, links);
         node.Data = kept;
-        // The new kind comes from the same script package as the old one, as Flow steps in one game module do.
-        var package = oldClass.OuterIndex;
-        node.ClassIndex = FindOrAddImport("/Script/CoreUObject", "Class", package, change.Kind);
-        node.TemplateIndex = FindOrAddImport(Import(package).ObjectName.ToString(), change.Kind, package, "Default__" + change.Kind);
+        if (change.Kind is not null)
+            (node.ClassIndex, node.TemplateIndex) = KindImports(kind);
     }
+
+    /// <summary>
+    /// Reserves an added step's id before any step is checked, so changes and other new steps can link to it. Returns
+    /// why it can't be added, or null.
+    /// </summary>
+    public string? Reserve(AddedNode added)
+    {
+        try
+        {
+            var id = UnrealGuid(added.Node);
+            if (StepIds().Contains(id) || !reserved.Add(id))
+                throw new EditException($"{Path.GetFileName(File)} already has a step {added.Node}.");
+            return null;
+        }
+        catch (EditException e)
+        {
+            return e.Message;
+        }
+    }
+
+    /// <summary>Checks that a reserved step can be added as asked without changing anything. Returns why not, or null.</summary>
+    public string? Check(AddedNode added)
+    {
+        try
+        {
+            Add(added, false);
+            return null;
+        }
+        catch (EditException e)
+        {
+            return e.Message;
+        }
+    }
+
+    public void Apply(AddedNode added) => Add(added, true);
+
+    readonly HashSet<Guid> reserved = [];
+
+    // A new export inside the graph, shaped like the game's own steps: the graph is its outer, the graph's map of steps
+    // points to it, and the graph lists it among the exports to create before the graph itself is read.
+    void Add(AddedNode added, bool commit)
+    {
+        var (graphIndex, graph) = Graph();
+        var steps = (MapPropertyData)graph.Data.First(p => p.Name.ToString() == "Nodes");
+        var sibling = asset.Exports.OfType<NormalExport>().First(e => NodeGuid(e) is not null);
+        var fields = StepFields(added.Kind);
+        var data = new List<PropertyData>();
+        SetFields(data, added.Kind, fields, added.Fields, true);
+        var links = Targets(added.Links);
+        if (!commit)
+            return;
+
+        var id = UnrealGuid(added.Node);
+        var guid = (StructPropertyData)sibling.Data.First(p => p.Name.ToString() == "NodeGuid").Clone();
+        ((GuidPropertyData)guid.Value[0]).Value = id;
+        data.Add(guid);
+        Link(data, links);
+
+        var (classIndex, templateIndex) = KindImports(added.Kind);
+        var export = new NormalExport(asset, sibling.Extras.ToArray())
+        {
+            ObjectName = UniqueName(added.Kind),
+            ClassIndex = classIndex,
+            TemplateIndex = templateIndex,
+            OuterIndex = FPackageIndex.FromExport(graphIndex),
+            SuperIndex = FPackageIndex.FromRawIndex(0),
+            ObjectFlags = sibling.ObjectFlags,
+            PackageGuid = sibling.PackageGuid,
+            Data = data,
+            SerializationBeforeSerializationDependencies = [],
+            CreateBeforeSerializationDependencies = [],
+            SerializationBeforeCreateDependencies = [classIndex, templateIndex],
+            CreateBeforeCreateDependencies = [FPackageIndex.FromExport(graphIndex)],
+        };
+        asset.Exports.Add(export);
+        var index = FPackageIndex.FromExport(asset.Exports.Count - 1);
+
+        var (key, value) = steps.Value.First();
+        var newKey = (StructPropertyData)key.Clone();
+        ((GuidPropertyData)newKey.Value[0]).Value = id;
+        var newValue = (ObjectPropertyData)value.Clone();
+        newValue.Value = index;
+        steps.Value.Add(newKey, newValue);
+        graph.CreateBeforeSerializationDependencies.Add(index);
+    }
+
+    (int Index, NormalExport Graph) Graph()
+    {
+        for (var i = 0; i < asset.Exports.Count; i++)
+            if (asset.Exports[i] is NormalExport e && e.Data.Any(p => p.Name.ToString() == "Nodes" && p is MapPropertyData))
+                return (i, e);
+        throw new EditException($"{Path.GetFileName(File)} isn't a Flow graph Cardinal can read.");
+    }
+
+    HashSet<Guid> StepIds() =>
+        asset.Exports.OfType<NormalExport>().Select(NodeGuid).OfType<Guid>().ToHashSet();
+
+    // Numbered after the game's own steps of the kind, as in FlowNode_Finish_0, FlowNode_Finish_1.
+    FName UniqueName(string kind)
+    {
+        var taken = asset.Exports.Select(e => e.ObjectName.ToString()).ToHashSet();
+        var number = 0;
+        while (taken.Contains($"{kind}_{number}"))
+            number++;
+        return Name($"{kind}_{number}");
+    }
+
+    Dictionary<string, UsmapProperty> StepFields(string kind)
+    {
+        var schema = Schema(kind);
+        if (!Lineage(schema).Any(s => s.Name == "FlowNode"))
+            throw new EditException($"{kind} isn't a kind of Flow step.");
+        return Lineage(schema).SelectMany(s => s.Properties.Values).ToDictionary(p => p.Name);
+    }
+
+    // Fields already on the step are only changed on commit; new ones are fresh objects, so setting them is harmless.
+    void SetFields(List<PropertyData> data, string kind, Dictionary<string, UsmapProperty> fields, Dictionary<string, string> values, bool commit)
+    {
+        foreach (var (name, text) in values)
+        {
+            var property = data.FirstOrDefault(p => p.Name.ToString() == name);
+            if (property is not null)
+            {
+                SetValue(property, text, commit);
+                continue;
+            }
+            property = NewProperty(fields.GetValueOrDefault(name) ?? throw new EditException($"{kind} has no field {name}."));
+            SetValue(property, text, true);
+            data.Add(property);
+        }
+    }
+
+    // The kind's class and its default object, imported from the module the mappings list for it.
+    (FPackageIndex Class, FPackageIndex Template) KindImports(string kind)
+    {
+        var module = Schema(kind).ModulePath;
+        var package = FindOrAddImport("/Script/CoreUObject", "Package", FPackageIndex.FromRawIndex(0), module);
+        return (FindOrAddImport("/Script/CoreUObject", "Class", package, kind),
+            FindOrAddImport(module, kind, package, "Default__" + kind));
+    }
+
+    static MapPropertyData? Connections(List<PropertyData> data) =>
+        data.OfType<MapPropertyData>().FirstOrDefault(m => m.Name.ToString() == "Connections");
+
+    // A link is "step id" or "step id:Pin"; an empty one removes the output's link.
+    List<(string Output, Guid? To, string Pin)> Targets(Dictionary<string, string>? links)
+    {
+        var targets = new List<(string, Guid?, string)>();
+        if (links is null)
+            return targets;
+        var known = StepIds();
+        foreach (var (output, text) in links)
+        {
+            if (text.Length == 0)
+            {
+                targets.Add((output, null, ""));
+                continue;
+            }
+            var cut = text.IndexOf(':');
+            var id = UnrealGuid(cut < 0 ? text : text[..cut]);
+            if (!known.Contains(id) && !reserved.Contains(id))
+                throw new EditException($"Output {output} leads to {text}, but {Path.GetFileName(File)} has no step {(cut < 0 ? text : text[..cut])}.");
+            targets.Add((output, id, cut < 0 ? "In" : text[(cut + 1)..]));
+        }
+        return targets;
+    }
+
+    void Link(List<PropertyData> data, List<(string Output, Guid? To, string Pin)> targets)
+    {
+        if (targets.Count == 0)
+            return;
+        var connections = Connections(data);
+        if (connections is null)
+        {
+            connections = (MapPropertyData)Template().Clone();
+            connections.Value.Clear();
+            data.Add(connections);
+        }
+        var (templateKey, templateValue) = Template().Value.First();
+        foreach (var (output, to, pin) in targets)
+        {
+            var old = connections.Value.Keys.FirstOrDefault(k => k is NamePropertyData n && n.Value.ToString() == output);
+            if (old is not null)
+                connections.Value.Remove(old);
+            if (to is null)
+                continue;
+            var key = (NamePropertyData)templateKey.Clone();
+            key.Value = Name(output);
+            var value = (StructPropertyData)templateValue.Clone();
+            var target = (StructPropertyData)value.Value.First(p => p.Name.ToString() == "NodeGuid");
+            ((GuidPropertyData)target.Value[0]).Value = to.Value;
+            ((NamePropertyData)value.Value.First(p => p.Name.ToString() == "PinName")).Value = Name(pin);
+            connections.Value.Add(key, value);
+        }
+    }
+
+    // Any link in the graph, as the pattern for new ones: every graph has at least its start step's.
+    MapPropertyData Template() =>
+        asset.Exports.OfType<NormalExport>().Select(e => Connections(e.Data)).FirstOrDefault(m => m is { Value.Count: > 0 })
+        ?? throw new EditException($"{Path.GetFileName(File)} has no links to copy the layout of.");
 
     // Projects write a step's NodeGuid the way the game's tools show it: four hex numbers, as in 3FC7D895-4BFD1ED9-8EF446A4-A5C5CCEA.
     static Guid UnrealGuid(string text)

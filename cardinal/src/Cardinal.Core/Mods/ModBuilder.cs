@@ -21,6 +21,8 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(NodeChange change, string problem) : this($"step {change.Label}", problem, true) { }
 
+    public EditProblem(AddedNode added, string problem) : this($"new step {added.Label}", problem, true) { }
+
     public override string ToString() => $"{Change}: {Problem}";
 }
 
@@ -134,7 +136,7 @@ public static class ModBuilder
                 if (AssetCopier.Check(game, registry, copy) is { } problem)
                     problems.Add(new EditProblem(copy, problem));
         }
-        if (project.Edits.Count + project.AddedRows.Count + project.AddedText.Count + project.NodeChanges.Count == 0)
+        if (project.AssetChanges == 0)
             return (plan, problems);
 
         var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
@@ -180,15 +182,38 @@ public static class ModBuilder
                 plan.Steps.Add(() => asset.Apply(target, edit));
         }
 
+        EditableAsset? Graph(string package, Action<string> fail)
+        {
+            var file = package.StartsWith("/Game/") ? AssetCopier.File(package) : null;
+            if (file is not null && game.Provider.Files.ContainsKey(file))
+                return Asset(file);
+            fail("no such asset. Write it as a /Game path, as in /Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Chest.");
+            return null;
+        }
+
+        // Every new step's id is reserved before anything is checked, so steps can link to new steps listed after them.
+        var reserved = new List<(AddedNode Added, EditableAsset Asset)>();
+        foreach (var added in project.AddedNodes)
+        {
+            if (Graph(added.Asset, p => problems.Add(new EditProblem(added, p))) is not { } asset)
+                continue;
+            if (asset.Reserve(added) is { } problem)
+                problems.Add(new EditProblem(added, problem));
+            else
+                reserved.Add((added, asset));
+        }
+        foreach (var (added, asset) in reserved)
+        {
+            if (asset.Check(added) is { } problem)
+                problems.Add(new EditProblem(added, problem));
+            else
+                plan.Steps.Add(() => asset.Apply(added));
+        }
+
         foreach (var change in project.NodeChanges)
         {
-            var file = change.Asset.StartsWith("/Game/") ? AssetCopier.File(change.Asset) : null;
-            if (file is null || !game.Provider.Files.ContainsKey(file))
-            {
-                problems.Add(new EditProblem(change, "no such asset. Write it as a /Game path, as in /Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Chest."));
+            if (Graph(change.Asset, p => problems.Add(new EditProblem(change, p))) is not { } asset)
                 continue;
-            }
-            var asset = Asset(file);
             if (asset.Check(change) is { } problem)
                 problems.Add(new EditProblem(change, problem));
             else

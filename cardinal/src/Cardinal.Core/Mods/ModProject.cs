@@ -75,13 +75,25 @@ public sealed record AssetCopy(string From, string Package)
 }
 
 /// <summary>
-/// A step of a Flow graph (story events, quests, tutorials) turned into another kind of step. Asset is the graph's
-/// /Game path and Node the step's NodeGuid. Kind is the new step class; fields the old and new kinds share keep their
-/// values, the old kind's others are dropped, and Fields sets the new kind's own. Outputs renames the step's output
-/// pins, old name to new, so it still leads to the same next steps.
+/// A change to a step of a Flow graph (story events, quests, tutorials). Asset is the graph's /Game path and Node the
+/// step's NodeGuid. Kind, when set, turns it into another kind of step: fields the old and new kinds share keep their
+/// values and the old kind's others are dropped. Fields sets the step's own fields. Outputs renames its output pins,
+/// old name to new, so it still leads to the same next steps, and Links then points outputs elsewhere.
 /// </summary>
-public sealed record NodeChange(string Asset, string Node, string Kind, Dictionary<string, string> Fields,
-    Dictionary<string, string> Outputs)
+public sealed record NodeChange(string Asset, string Node, string? Kind, Dictionary<string, string> Fields,
+    Dictionary<string, string> Outputs, Dictionary<string, string>? Links = null)
+{
+    [JsonIgnore]
+    public string Label => $"{Asset} / {Node}";
+}
+
+/// <summary>
+/// A new step in a Flow graph. Node is the id it gets, written like any step's NodeGuid, which links from other steps
+/// use. Links maps each of its outputs to the step it leads to: a step id arrives at that step's In pin, and
+/// "id:Pin" at another one.
+/// </summary>
+public sealed record AddedNode(string Asset, string Node, string Kind, Dictionary<string, string> Fields,
+    Dictionary<string, string> Links)
 {
     [JsonIgnore]
     public string Label => $"{Asset} / {Node}";
@@ -90,12 +102,12 @@ public sealed record NodeChange(string Asset, string Node, string Kind, Dictiona
 /// <summary>
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
-/// Format 2 added text edits, format 3 added rows and text, format 4 copied assets, and format 5 changed Flow steps;
-/// older files load unchanged.
+/// Format 2 added text edits, format 3 added rows and text, format 4 copied assets, format 5 changed Flow steps, and
+/// format 6 added Flow steps and links; older files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
-    public const int CurrentFormat = 5;
+    public const int CurrentFormat = 6;
 
     // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
     // The merged patch takes the top number, so it wins over every mod it was merged from.
@@ -122,14 +134,19 @@ public sealed partial class ModProject
     public List<AddedText> AddedText { get; set; } = [];
     public List<AssetCopy> AddedAssets { get; set; } = [];
     public List<NodeChange> NodeChanges { get; set; } = [];
+    public List<AddedNode> AddedNodes { get; set; } = [];
 
     /// <summary>Every change of every kind.</summary>
     [JsonIgnore]
-    public int Changes => Edits.Count + TextEdits.Count + AddedRows.Count + AddedText.Count + AddedAssets.Count + NodeChanges.Count;
+    public int Changes => TextEdits.Count + AddedAssets.Count + AssetChanges;
 
     /// <summary>Whether a build has a container (.utoc and .ucas) besides the .pak: anything but text changes.</summary>
     [JsonIgnore]
-    public bool HasContainer => Edits.Count + AddedRows.Count + AddedText.Count + AddedAssets.Count + NodeChanges.Count > 0;
+    public bool HasContainer => AddedAssets.Count + AssetChanges > 0;
+
+    /// <summary>Changes made inside the game's own assets.</summary>
+    [JsonIgnore]
+    public int AssetChanges => Edits.Count + AddedRows.Count + AddedText.Count + NodeChanges.Count + AddedNodes.Count;
 
     public static ModProject Load(string path)
     {
@@ -249,6 +266,21 @@ public sealed partial class ModProject
 
     public bool RemoveNode(string asset, string node) =>
         FindNode(asset, node) is { } change && NodeChanges.Remove(change);
+
+    public AddedNode? FindAddedNode(string asset, string node) =>
+        AddedNodes.FirstOrDefault(n => n.Asset.Equals(asset, StringComparison.OrdinalIgnoreCase) && n.Node == node);
+
+    /// <summary>Adds the step, replacing an earlier addition with the same id in the same graph.</summary>
+    public void SetAddedNode(AddedNode added)
+    {
+        if (FindAddedNode(added.Asset, added.Node) is { } old)
+            AddedNodes[AddedNodes.IndexOf(old)] = added;
+        else
+            AddedNodes.Add(added);
+    }
+
+    public bool RemoveAddedNode(string asset, string node) =>
+        FindAddedNode(asset, node) is { } added && AddedNodes.Remove(added);
 
     /// <summary>
     /// The name the built files get: BaseName(), then the priority and _P.

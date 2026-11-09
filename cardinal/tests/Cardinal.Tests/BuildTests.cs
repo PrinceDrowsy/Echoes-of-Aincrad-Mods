@@ -1,4 +1,5 @@
 using Cardinal.Mods;
+using Cardinal.Scripts;
 using Cardinal.Tables;
 using Cardinal.Text;
 using Newtonsoft.Json.Linq;
@@ -161,6 +162,50 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
         var next = Assert.Single(fields["Connections"]!);
         Assert.Equal("Out", (string?)next["Key"]);
         Assert.Equal("FA92D775-47096F42-36F68683-723CA16C", (string?)next["Value"]!["NodeGuid"]);
+    }
+
+    [Fact]
+    public void FlowStepsCanBeAddedAndLinked()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        // A story check slipped in after Guard's tutorial step: before step 23000 it carries on as before, otherwise it
+        // goes to a second new step that ends the script.
+        const string graph = "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17";
+        const string tutorial = "2DB3554C-4DB8679E-01354D89-95299F90", next = "FA92D775-47096F42-36F68683-723CA16C";
+        const string check = "C0DE0001-00000000-00000000-00000001", finish = "C0DE0001-00000000-00000000-00000002";
+        var added = new AddedNode(graph, check, "FlowNode_CheckMainStory", new() { ["CheckProgress"] = "23000" },
+            new() { ["[<] Less than"] = next, ["[=] Equal"] = finish, ["[>] Greater than"] = finish + ":In" });
+        var end = new AddedNode(graph, finish, "FlowNode_Finish", [], []);
+        var rewire = new NodeChange(graph, tutorial, null, [], [], new() { ["Completed"] = check });
+
+        var wrong = new ModProject { Name = "Wrong" };
+        wrong.SetAddedNode(added with { Node = tutorial });
+        wrong.SetAddedNode(end with { Node = "C0DE0001-00000000-00000000-00000003", Kind = "FlowNode_Nothing" });
+        wrong.SetAddedNode(end with { Node = "C0DE0001-00000000-00000000-00000004", Links = new() { ["Out"] = "00000000-00000000-00000000-00000009" } });
+        Assert.Equal(3, ModBuilder.Check(game, fixture.Settings, wrong).Count(p => p.Blocks));
+
+        var project = new ModProject { Name = "Checked" };
+        project.SetNode(rewire);
+        project.SetAddedNode(added);
+        project.SetAddedNode(end);
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+
+        using var modded = Game.Open(fixture.Settings, true);
+        // The game lists some graphs twice, under folders spelled in different case; this is the file the mod replaced.
+        var script = Script.Load(modded, Script.List(modded).First(s => s.File == AssetCopier.File(graph)));
+        ScriptStep Step(string id) => script.Steps.Single(s => s.Id == id);
+        Assert.Equal(check, Assert.Single(Step(tutorial).Links).To);
+        var checkStep = Step(check);
+        Assert.Equal("FlowNode_CheckMainStory", checkStep.Kind);
+        Assert.Equal(23000, (int?)checkStep.Fields["CheckProgress"]);
+        Assert.True(checkStep.Reachable);
+        Assert.Equal([("[<] Less than", next), ("[=] Equal", finish), ("[>] Greater than", finish)],
+            checkStep.Links.Select(l => (l.Output, l.To)).OrderBy(l => l.Output, StringComparer.Ordinal));
+        Assert.All(checkStep.Links, l => Assert.Equal("In", l.Input));
+        Assert.Equal("FlowNode_Finish", Step(finish).Kind);
+        Assert.True(Step(finish).Reachable);
     }
 
     [Fact]

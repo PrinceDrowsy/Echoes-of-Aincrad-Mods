@@ -62,8 +62,13 @@ public static class ModMerge
             // Like a new row, a step changed by two mods is the one each expects, so that's always a clash.
             foreach (var change in project.NodeChanges)
             {
-                Add(rows, "step " + change.Label, project.Name, change.Kind + string.Concat(change.Fields.Select(f => $", {f.Key} {f.Value}")));
+                Add(rows, "step " + change.Label, project.Name, Describe(change.Kind ?? "same kind", change.Fields, change.Links));
                 merged.SetNode(change);
+            }
+            foreach (var added in project.AddedNodes)
+            {
+                Add(rows, "new step " + added.Label, project.Name, Describe(added.Kind, added.Fields, added.Links));
+                merged.SetAddedNode(added);
             }
             foreach (var added in project.AddedText)
             {
@@ -84,6 +89,10 @@ public static class ModMerge
             .ToList();
         return (merged, clashes);
     }
+
+    static string Describe(string kind, Dictionary<string, string> fields, Dictionary<string, string>? links) =>
+        kind + string.Concat(fields.Select(f => $", {f.Key} {f.Value}"))
+             + string.Concat((links ?? []).Select(l => $", {l.Key} to {(l.Value.Length > 0 ? l.Value : "nothing")}"));
 
     static void Add(Dictionary<string, List<(string, string)>> setters, string change, string mod, string value)
     {
