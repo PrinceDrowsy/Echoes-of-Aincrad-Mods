@@ -67,10 +67,10 @@ public partial class MainWindow : Window
         KeyBox.Text = settings.AesKey ?? "";
         MappingsBox.Text = settings.MappingsFile ?? "";
         OodleBox.Text = settings.OodleFile ?? "";
-        // The game's languages are only known once its files are open; until then the box shows the current choice.
         choosingLanguage = true;
-        LanguageBox.ItemsSource = new[] { new CultureItem(settings.TextLanguage, GameText.Name(settings.TextLanguage)) };
-        LanguageBox.SelectedIndex = 0;
+        LanguageBox.ItemsSource = GameText.Shipped.Append(settings.TextLanguage).Distinct()
+            .Select(c => new CultureItem(c, GameText.Name(c))).ToList();
+        LanguageBox.SelectedIndex = GameText.Shipped.Append(settings.TextLanguage).Distinct().ToList().IndexOf(settings.TextLanguage);
         choosingLanguage = false;
         Map.Hover += text => Status.Text = text;
         Closing += ConfirmClose;
@@ -211,12 +211,16 @@ public partial class MainWindow : Window
 
     bool choosingLanguage;
 
+    // Before the game files are open this only remembers the choice; once they are, it opens them again in it.
     void LanguageSelected(object sender, SelectionChangedEventArgs e)
     {
         if (choosingLanguage || LanguageBox.SelectedItem is not CultureItem selected || selected.Code == settings.TextLanguage)
             return;
         settings.TextLanguage = selected.Code;
-        OpenGame(sender, e);
+        if (game is null)
+            settings.Save();
+        else
+            OpenGame(sender, e);
     }
 
     async void ScriptSelected(object sender, SelectionChangedEventArgs e)

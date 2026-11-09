@@ -13,6 +13,13 @@ public static class GameText
 
     public static string FilePath(string culture) => $"{Folder}{culture}/Game.locres";
 
+    /// <summary>
+    /// The languages the game has shipped since release, offered before its files are open (they're encrypted until then).
+    /// Once they're open, Cultures reads the real list, so a language an update adds still shows.
+    /// </summary>
+    public static readonly IReadOnlyList<string> Shipped =
+        ["de", "en", "en-AU", "es-419", "es-ES", "fr", "id", "it", "ja-JP", "ko", "pt-BR", "ru", "th", "zh-Hans-CN", "zh-Hant-TW"];
+
     /// <summary>Culture codes the game has text for, such as en and ja-JP, with their names as they appear in the game files.</summary>
     public static IReadOnlyList<string> Cultures(Game game) =>
         game.Provider.Files.Values

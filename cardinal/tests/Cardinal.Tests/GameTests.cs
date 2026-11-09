@@ -112,6 +112,8 @@ public class GameTests(GameFixture fixture)
             Assert.NotEqual(english, japanese.Text("PartnerName_ARG"));
             Assert.Equal(GameText.Load(game, "ja-JP").Get(Game.TextNamespace, "PartnerName_ARG"), japanese.Text("PartnerName_ARG"));
         }
+        // The languages offered before the files are open have to be the ones the game actually has.
+        Assert.Equal(GameText.Cultures(game), GameText.Shipped);
         using var unknown = Game.Open(With("xx-XX"));
         Assert.Equal(GameText.English, unknown.Language);
         Assert.Equal(english, unknown.Text("PartnerName_ARG"));
