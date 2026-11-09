@@ -1,0 +1,547 @@
+{
+  "formatVersion": 5,
+  "name": "SmoothSailing",
+  "version": "0.1.0",
+  "author": "PrinceDrowsy",
+  "description": "Smooth Sailing: tutorials arrive as a hint and a message instead of a pausing window.",
+  "priority": 1000,
+  "nodeChanges": [
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_DeatGameMode",
+      "node": "3FC7D895-4BFD1ED9-8EF446A4-A5C5CCEA",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_DeatGameMode",
+      "node": "135D0640-4EFCAC53-4020F8A7-A0A7A25E",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "21",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_02_09/Flow_pev_01_02_09",
+      "node": "287C891B-44685DCD-F8930BAF-2117031A",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Operation",
+        "TutorialID": "26",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition",
+      "node": "5AD50682-487FE688-DFA7F8B6-AF77BD5D",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition_Urbas",
+      "node": "0875E52D-4BBA0944-DD486E80-C5FEADDF",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition_Hornca",
+      "node": "28AD08CC-48C052DD-FD96A3B9-7486A7C3",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Kostum",
+      "node": "335890AA-44DA6EF6-6CE8878A-B0FB6F6B",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition_Talan",
+      "node": "65922329-4814A5E8-32672690-8849555E",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_ClearFlag",
+      "node": "124A4C8C-447CD8E5-CE680FB9-1A380000",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Explorations",
+        "TutorialID": "12",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_ClearFlag",
+      "node": "2B58A6F9-4A37919B-309EDB9B-C3D1420D",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "21",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_ClearFlag",
+      "node": "1F8EAFB4-482AB62B-C07C11AF-DAC87687",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "21",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_ClearFlag",
+      "node": "8C254FDB-43C7A310-A2F51193-EFF60E6E",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_WeaponLv",
+      "node": "D631DF48-4DBB5405-9E667C81-33E1E9D5",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_SwordSkill",
+      "node": "2FD31858-4C92012B-98A2C79A-005E8646",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Dungeon",
+      "node": "E7E93361-4BBE2E02-F224788E-ADD2283C",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Dungeon",
+      "node": "7A91E2E5-4F8E8D09-3B47E7B1-AE79557F",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition_Malome",
+      "node": "10F2EA1B-4D61FC6F-FC2DDABD-0B002EBE",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_composition_Tolbana",
+      "node": "7B02DBFF-48F2F082-53347294-6BA76C35",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Menu",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Hint",
+      "node": "60566DAD-4F37A5D8-BA6FB9A3-AC20FE65",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Condition",
+      "node": "3B54B5A7-4AF32ABF-020E23BA-A1145E8E",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Status",
+        "TutorialID": "11",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Tutorial/Flow_Tutorial_Keystone",
+      "node": "B2EA71F5-4389A232-3EA0F9A4-29EE7525",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Explorations",
+        "TutorialID": "13",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/Flow_DeathFadeEvent",
+      "node": "02699E0E-457DA328-FA122DB6-F2B57111",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/Flow_pev_01_01_27",
+      "node": "44DDFCA4-41AB8A90-88AD2288-F0D37E18",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/Flow_pev_01_01_22",
+      "node": "0FFF906A-4BC288D8-230129BE-B51DF178",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/Flow_pev_01_01_25",
+      "node": "9FF3529B-436DE9E5-EC729C9C-FCF571D6",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/Flow_pev_01_01_30",
+      "node": "AEAAA1EF-4CDDDDC6-B0D74BB3-9D8113D1",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "TutorialCategory": "ETutorialCategory::Explorations",
+        "TutorialID": "3",
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/PEV_01_01_09/Flow_pev_01_01_09",
+      "node": "2E79495E-4FEC7CDA-C1A81588-2A0C5A18",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_10/Flow_pev_01_01_10",
+      "node": "C26203C5-4BDCD024-58806C85-8EE0C6F2",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_06/Flow_pev_01_01_06",
+      "node": "988A5660-4500BF18-32F7DBA2-1DAF5806",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    },
+    {
+      "asset": "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17",
+      "node": "2DB3554C-4DB8679E-01354D89-95299F90",
+      "kind": "FlowNode_TutorialGuide",
+      "fields": {
+        "bShow": "true",
+        "bShowInfoMessage": "true"
+      },
+      "outputs": {
+        "Completed": "Out"
+      }
+    }
+  ],
+  "edits": [
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "25",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "37",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "40",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "33",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "27",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "34",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "35",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "51",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "88",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "98",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "99",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "84",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "85",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "19",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "14",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "18",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "24",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "44",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "42",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "67",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    },
+    {
+      "table": "Other/DT_TutorialUISystemList",
+      "row": "64",
+      "field": "DisplayTime",
+      "value": "6",
+      "original": "0"
+    }
+  ]
+}
