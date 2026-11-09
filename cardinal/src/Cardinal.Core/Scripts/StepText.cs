@@ -37,12 +37,16 @@ public sealed partial class StepText(Game game, Locres language)
         ("EnemyAnimalAI", "enemies and animals paused", "enemies and animals moving again"),
     ];
 
-    /// <summary>Every step of the script told in a sentence, by step id.</summary>
-    public IReadOnlyDictionary<string, StepSentence> Describe(Script script) =>
-        script.Steps.ToDictionary(s => s.Id, Describe);
+    /// <summary>
+    /// Every step of the script told in a sentence, by step id. Cast members show as their number unless names is set,
+    /// since a scene often calls someone by a title ("Fencer") before the story says who they are.
+    /// </summary>
+    public IReadOnlyDictionary<string, StepSentence> Describe(Script script, bool names) =>
+        script.Steps.ToDictionary(s => s.Id, s => Describe(s, names));
 
-    StepSentence Describe(ScriptStep step)
+    StepSentence Describe(ScriptStep step, bool names)
     {
+        string Character(string id) => names && Name(id) is { } name ? $"{name} ({id})" : $"character {id}";
         var kind = Script.KindName(step.Kind);
         var f = step.Fields;
         string Who(JToken? target) => (Enum(target?["Target"]), (string?)target?["ID"]) switch
@@ -113,13 +117,13 @@ public sealed partial class StepText(Game game, Locres language)
         return new StepSentence(text ?? $"{kind}: {Script.Settings(step)}", StagingKinds.Contains(kind));
     }
 
-    readonly Dictionary<string, string> characters = [];
+    readonly Dictionary<string, string?> characters = [];
 
     // A cast number is a character's own number: NPCData_<number> defines the character, and a partner's entry names
     // its partner code, whose PartnerName_<code> is the name the game shows. Only that chain names anyone; guessing from
     // dialogue would be wrong (a talk step's target can be the listener). Extras and partners without a name stay numbers,
     // and the number always shows, so the name can be checked.
-    string Character(string id)
+    string? Name(string id)
     {
         if (characters.TryGetValue(id, out var known))
             return known;
@@ -134,7 +138,7 @@ public sealed partial class StepText(Game game, Locres language)
             if ((bool?)appearance?["bPartner"] == true && (string?)appearance["PartnerID"] is { Length: > 0 } code)
                 name = Line("PartnerName_" + code);
         }
-        return characters[id] = name is null ? $"character {id}" : $"{name} ({id})";
+        return characters[id] = name;
     }
 
     /// <summary>

@@ -140,6 +140,8 @@
                         <DockPanel DockPanel.Dock="Top" Margin="6,4,6,0">
                             <CheckBox x:Name="TechnicalBox" DockPanel.Dock="Right" Content="Technical view" Margin="12,0,0,0" Click="ScriptViewChanged"
                                       ToolTip="Shows every step with its class, raw settings and id, as a step change in a project refers to them." />
+                            <CheckBox x:Name="NamesBox" DockPanel.Dock="Right" Content="Show real names" Margin="12,0,0,0" Click="ScriptViewChanged"
+                                      ToolTip="Names each cast member from the game's own cast data, as in Stella (4018). Scenes often call someone by a title before the story says who they are, so this can spoil that." />
                             <CheckBox x:Name="StagingBox" DockPanel.Dock="Right" Content="Show staging" Click="ScriptViewChanged"
                                       ToolTip="Also shows the steps that only stage a scene: camera moves, animations, looks, fades and waits." />
                             <TextBlock x:Name="ScriptInfo" Foreground="Gray" TextWrapping="Wrap"

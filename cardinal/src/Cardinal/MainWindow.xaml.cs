@@ -223,7 +223,7 @@ public partial class MainWindow : Window
         if (script is null || stepText is null)
             return;
         var technical = TechnicalBox.IsChecked == true;
-        var sentences = stepText.Describe(script);
+        var sentences = stepText.Describe(script, NamesBox.IsChecked == true);
         bool Shown(ScriptStep step) => technical || StagingBox.IsChecked == true || !sentences[step.Id].Staging;
         var shown = script.Steps.Where(Shown).ToList();
         // Shown steps are numbered 1, 2, 3 as listed, so "then" points at a row that's on screen.
