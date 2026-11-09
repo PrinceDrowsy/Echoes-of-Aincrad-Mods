@@ -148,6 +148,8 @@ NotifyOnNewObject("/Script/ROD.RODMessageWindowWidget", function(window)
         end
         local shown = text:GetText():ToString()
         if noticeTexts[shown] then
+            -- It can't be answered until its opening animation ends, so it's hidden in the meantime.
+            window:SetRenderOpacity(0)
             close(window, noticeTexts[shown])
         else
             mod.debug("message window, not a notice: " .. shown:sub(1, 60))
