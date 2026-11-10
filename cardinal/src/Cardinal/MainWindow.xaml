@@ -1,4 +1,4 @@
-<Window x:Class="Cardinal.MainWindow"
+﻿<Window x:Class="Cardinal.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Cardinal"
@@ -128,6 +128,9 @@
                     <DockPanel>
                         <DockPanel DockPanel.Dock="Top" Margin="4">
                             <TextBlock DockPanel.Dock="Left" Text="Find" VerticalAlignment="Center" Margin="0,0,6,0" />
+                            <CheckBox x:Name="InsideBox" DockPanel.Dock="Right" Content="Inside scripts" VerticalAlignment="Center" Margin="6,0,0,0"
+                                      Checked="InsideChanged" Unchecked="InsideChanged"
+                                      ToolTip="Also finds scripts with a step where every word appears: in what it does, its kind, settings or id, or its cutscene's dialogue, such as Iori 1008 or SetMainStory 23010. Matching rows are marked in the script. It searches the game's own text, and names stay hidden as Show real names hides them. The first search reads every script, which takes a few seconds." />
                             <TextBox x:Name="ScriptSearchBox" TextChanged="ScriptSearchChanged"
                                      ToolTip="Shows the scripts whose folder or name contains this, such as Tutorial or pev_01_01." />
                         </DockPanel>
@@ -166,6 +169,10 @@
                             <DataGrid.RowStyle>
                                 <Style TargetType="DataGridRow">
                                     <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Match}" Value="True">
+                                            <Setter Property="Background" Value="#CDE8FF" />
+                                            <Setter Property="Foreground" Value="Black" />
+                                        </DataTrigger>
                                         <DataTrigger Binding="{Binding Edited}" Value="True">
                                             <Setter Property="Background" Value="#FFEC96" />
                                             <Setter Property="Foreground" Value="Black" />

@@ -54,6 +54,8 @@ public partial class MainWindow : Window
 
     Script? script;
     StepText? stepText;
+    ScriptIndex? scriptIndex;
+    bool indexing;
 
     ModProject project = new();
     string? projectPath;
@@ -176,6 +178,7 @@ public partial class MainWindow : Window
         StepGrid.ItemsSource = null;
         script = null;
         stepText = null;
+        scriptIndex = null;
         FloorBox.ItemsSource = opened.Floors;
         FloorBox.SelectedIndex = 0;
         var cultures = opened.Cultures.Select(c => new CultureItem(c, GameText.NativeName(c))).ToList();
@@ -239,7 +242,12 @@ public partial class MainWindow : Window
         Status.Text = $"{selected.Folder} / {selected.Name}";
     }
 
-    void ScriptViewChanged(object sender, RoutedEventArgs e) => ShowSteps();
+    void ScriptViewChanged(object sender, RoutedEventArgs e) => FilterScripts();
+
+    // The names switch only counts where the story view uses it, so Find never turns up a name the view would hide.
+    bool RealNames => NamesBox.IsChecked == true && NamesBox.IsEnabled;
+
+    bool FindingInside => InsideBox.IsChecked == true && ScriptSearchBox.Text.Trim().Length > 0;
 
     // The story view tells each step in a sentence and leaves staging out unless asked; the technical view shows every step raw.
     void ShowSteps()
@@ -250,8 +258,12 @@ public partial class MainWindow : Window
         // The names switch only changes rows where Cardinal names a character itself, which are staging rows.
         NamesBox.IsEnabled = StagingBox.IsChecked == true && !technical;
         stepText.Edits = project.TextEdits.Where(t => t.Culture == game!.Language).ToDictionary(t => t.Key, t => t.Value);
-        var sentences = stepText.Describe(script, NamesBox.IsChecked == true && NamesBox.IsEnabled);
-        bool Shown(ScriptStep step) => technical || StagingBox.IsChecked == true || !sentences[step.Id].Staging;
+        var sentences = stepText.Describe(script, RealNames);
+        var words = FindingInside ? ScriptIndex.Words(ScriptSearchBox.Text) : [];
+        bool Match(ScriptStep step) => words.Length > 0
+            && ScriptIndex.Matches(words, sentences[step.Id].Text, Script.KindName(step.Kind), Script.Settings(step), step.Id, sentences[step.Id].TextKey);
+        // A matching step shows even when it only stages the scene, so Find never points at a hidden row.
+        bool Shown(ScriptStep step) => technical || StagingBox.IsChecked == true || !sentences[step.Id].Staging || Match(step);
         var shown = script.Steps.Where(Shown).ToList();
         // Shown steps are numbered 1, 2, 3 as listed, so "then" points at a row that's on screen.
         var numbers = shown.Select((s, i) => (s.Id, i + 1)).ToDictionary();
@@ -263,11 +275,12 @@ public partial class MainWindow : Window
         {
             var sentence = sentences[s.Id];
             rows.Add(new StepRow(Number(s).ToString(), OneLine(sentence.Text), script.Then(s, Shown, Number), Script.KindName(s.Kind),
-                Script.Settings(s), script.Leads(s), s.Id, sentence.TextKey, Edited(sentence.TextKey)));
+                Script.Settings(s), script.Leads(s), s.Id, sentence.TextKey, Edited(sentence.TextKey), Match(s)));
             // With one cutscene the event's lines are its dialogue; with several there's no telling which says what.
             if (cutscenes is [var only] && only == s)
                 rows.AddRange(eventLines.Select(line =>
-                    new StepRow("", "      " + OneLine(line.Text), "", "", "", "", "", line.Key, Edited(line.Key))));
+                    new StepRow("", "      " + OneLine(line.Text), "", "", "", "", "", line.Key, Edited(line.Key),
+                        words.Length > 0 && ScriptIndex.Matches(words, line.Text, line.Key))));
         }
         StepGrid.ItemsSource = rows;
         foreach (var column in new[] { WhatColumn, ThenColumn })
@@ -277,8 +290,11 @@ public partial class MainWindow : Window
         ScriptInfo.Text = (shown.Count == script.Steps.Count
             ? $"{script.Source.Package}: {script.Steps.Count} steps."
             : $"{script.Source.Package}: {shown.Count} of {script.Steps.Count} steps; the rest only stage the scene.")
-            + (cutscenes.Count > 1 && eventLines.Count > 0 ? $" Its {cutscenes.Count} cutscenes share {eventLines.Count} lines of dialogue." : "");
+            + (cutscenes.Count > 1 && eventLines.Count > 0 ? $" Its {cutscenes.Count} cutscenes share {eventLines.Count} lines of dialogue." : "")
+            + (words.Length > 0 ? $" Find marks {Rows(rows.Count(r => r.Match))}." : "");
     }
+
+    static string Rows(int count) => count == 1 ? "1 row" : $"{count} rows";
 
     // Subtitles break lines for the screen; in a row they read better as one.
     static string OneLine(string text) => text.Replace("\r\n", " ").Replace('\n', ' ');
@@ -313,14 +329,40 @@ public partial class MainWindow : Window
         }
     }
 
-    void ScriptSearchChanged(object sender, TextChangedEventArgs e)
+    void ScriptSearchChanged(object sender, TextChangedEventArgs e) => FilterScripts();
+
+    void InsideChanged(object sender, RoutedEventArgs e) => FilterScripts();
+
+    // Names filter as you type. Inside scripts, the first search reads every script once, and later ones use what it read.
+    async void FilterScripts()
     {
-        if (ScriptList.ItemsSource is not ListCollectionView view)
+        if (game is null || ScriptList.ItemsSource is not ListCollectionView view)
             return;
+        if (FindingInside && scriptIndex is null)
+        {
+            if (indexing)
+                return;
+            indexing = true;
+            var current = game;
+            var sources = view.SourceCollection.Cast<ScriptSource>().ToList();
+            var built = await Run("Reading every script for Find, the first time only...",
+                () => ScriptIndex.Build(current, StepText.For(current, current.Language), sources));
+            indexing = false;
+            if (built is null || current != game)
+                return;
+            scriptIndex = built;
+            Status.Text = $"Read {sources.Count} scripts for Find.";
+        }
+
         var find = ScriptSearchBox.Text.Trim();
+        var inside = FindingInside && scriptIndex is not null
+            ? scriptIndex.Find(find, RealNames).Select(s => s.Source.File).ToHashSet(StringComparer.OrdinalIgnoreCase)
+            : null;
         view.Filter = find.Length == 0
             ? null
-            : item => item is ScriptSource s && (s.Folder + "/" + s.Name).Contains(find, StringComparison.OrdinalIgnoreCase);
+            : item => item is ScriptSource s && ((s.Folder + "/" + s.Name).Contains(find, StringComparison.OrdinalIgnoreCase)
+                                                 || inside?.Contains(s.File) == true);
+        ShowSteps();
     }
 
     static DataGridTextColumn Column(string header, int index)
