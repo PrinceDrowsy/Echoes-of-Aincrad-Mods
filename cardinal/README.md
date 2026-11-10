@@ -96,6 +96,7 @@ Cardinal.exe list layers WL02
 Cardinal.exe export tables --out DIR [--only Items/MaterialItem,Skills/DT_ActiveSkillList]
 Cardinal.exe export map WL02|all --out DIR
 Cardinal.exe list cultures
+Cardinal.exe find steps WORDS... [--real-names]
 Cardinal.exe text get CULTURE KEY
 Cardinal.exe text set PROJECT.json CULTURE NAMESPACE KEY TEXT
 Cardinal.exe text export CULTURE --out FILE.csv [--project PROJECT.json]
@@ -118,6 +119,7 @@ Cardinal.exe help
 - `list tables` prints each table's id, source and `editable` or `read-only`.
 - `set` checks one change against the game file and saves it in the project, creating the project if it doesn't exist. `FIELD` is the column name as the table shows it, such as `CoolTime` or `QuestData.Floor`. Setting a field back to its original value removes the change. Example: `Cardinal.exe set MyMod.json Skills/DT_ActiveSkillList 0 CoolTime 2.5`.
 - `list cultures` prints each language the game has text for: its code (`en`, `ja-JP`, ...), name and number of lines. `CULTURE` takes the code, in any case.
+- `find steps` searches every script for steps where all the words appear: in what the step does, its kind, settings or id, or a line of its cutscene's dialogue. It prints the script, step number (`line` and the text key for dialogue), kind and what happens, as the Scripts tab tells it. Names the story view hides until the subtitles say them stay hidden and can't be found, unless you add `--real-names`. In the window, tick **Inside scripts** next to Find in the Scripts tab: the list keeps only scripts with a match, and matching rows are marked. Both search the game's own text, not a project's text edits.
 - `text get` prints every line with that key in that language: namespace, key and text, tab-separated. `text set` changes one line in the project, like `set` does for values. Output is UTF-8.
 - `text export` and `text import` are the translating round trip described in [Changing text](#changing-text). `text import` exits with 5 when it skipped or flagged any line.
 - `build` checks every change first and builds nothing if any is wrong. `--install` builds straight into `Paks\~mods` and refuses to replace an earlier build of the same mod unless you add `--force`.

@@ -1,6 +1,7 @@
 using System.IO;
 using Cardinal.Maps;
 using Cardinal.Mods;
+using Cardinal.Scripts;
 using Cardinal.Tables;
 using Cardinal.Text;
 using UAssetAPI.Unversioned;
@@ -23,6 +24,10 @@ static class Cli
           list floors              Floors with a World Partition map.
           list layers FLOOR        A floor's data layers: name, parent, developer, cell count.
           list cultures            Languages the game has text for: code, name, number of lines.
+          find steps WORDS... [--real-names]
+                Steps of the game's scripts where every word appears, in what the step does, its kind, settings or
+                id, or a line of its cutscene's dialogue: script, step number, kind, what happens. Names the story
+                view would hide until the subtitles say them aren't found unless --real-names is given.
           export tables --out DIR [--only ID[,ID...]]
                 JSON and CSV per table in DIR/Group/, plus DIR/tables.json.
           export map FLOOR|all --out DIR
@@ -94,6 +99,7 @@ static class Cli
                 2 when Word(0) == "list" && Word(1) == "floors" => WithGame(options, (game, _) => Lines(FloorMap.Floors(game))),
                 3 when Word(0) == "list" && Word(1) == "layers" => WithGame(options, (game, _) => ListLayers(game, w[2])),
                 2 when Word(0) == "list" && Word(1) == "cultures" => WithGame(options, (game, _) => ListCultures(game)),
+                >= 3 when Word(0) == "find" && Word(1) == "steps" => WithGame(options, (game, _) => FindSteps(game, string.Join(' ', w.Skip(2)), options.Has("real-names"))),
                 4 when Word(0) == "text" && Word(1) == "get" => WithGame(options, (game, _) => GetText(game, w[2], w[3])),
                 7 when Word(0) == "text" && Word(1) == "set" => WithUnmoddedGame(options, (game, _) => SetText(game, w[2], w[3], w[4], w[5], w[6])),
                 3 when Word(0) == "text" && Word(1) == "export" => WithGame(options, (game, _) => ExportText(game, w[2], options)),
@@ -211,6 +217,14 @@ static class Cli
 
     static int ListCultures(Game game) =>
         Lines(GameText.Cultures(game).Select(c => $"{c}\t{GameText.Name(c)}\t{GameText.Load(game, c).Count}"));
+
+    static int FindSteps(Game game, string query, bool names)
+    {
+        var index = ScriptIndex.Build(game, StepText.For(game, game.Language), Script.List(game));
+        return Lines(index.Find(query, names).Select(s => s.Id.Length > 0
+            ? $"{s.Source.Folder}/{s.Source.Name}	{s.Number}	{s.Kind}	{s.Text(names)}"
+            : $"{s.Source.Folder}/{s.Source.Name}	line	{s.TextKey}	{s.Text(names)}"));
+    }
 
     static string Culture(Game game, string culture) =>
         GameText.Find(game, culture) ?? throw new ArgumentException($"The game has no text in {culture}. Run Cardinal list cultures.");
@@ -462,7 +476,7 @@ static class Cli
 
     sealed class Options
     {
-        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds"];
+        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds", "real-names"];
         static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project", "from", "id", "name", "description", "category"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.

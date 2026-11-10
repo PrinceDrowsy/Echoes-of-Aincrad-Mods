@@ -96,6 +96,24 @@ public class GameTests(GameFixture fixture)
     }
 
     [Fact]
+    public void FindSearchesEveryScriptWithoutSpoilingNames()
+    {
+        var game = fixture.Require();
+        var index = ScriptIndex.Build(game, StepText.For(game, game.Language), Script.List(game));
+
+        var step = Assert.Single(index.Find("setmainstory 23010", false));
+        Assert.Equal("Flow_Main_23000", step.Source.Name);
+        Assert.Equal(18, step.Number);
+        Assert.Contains(index.Steps, s => s.Id.Length == 0 && s.TextKey is not null);
+
+        // A name the story view hides until the subtitles say it can't be found with names off.
+        var named = index.Steps.First(s => s.Named is not null);
+        var name = ScriptIndex.Words(named.Named!).First(w => !named.Sentence.Contains(w));
+        Assert.DoesNotContain(named, index.Find(name, false));
+        Assert.Contains(named, index.Find(name, true));
+    }
+
+    [Fact]
     public void GameTextShowsInTheChosenLanguage()
     {
         var game = fixture.Require();
