@@ -156,7 +156,7 @@ The export shows the table's rows and columns as CSV and JSON, so the row key an
 
 ## Mod projects
 
-A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 6. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, version 4 `addedAssets`, version 5 `nodeChanges`, and version 6 `addedNodes` and links. Older files open unchanged, and are saved as version 6.
+A project is a small JSON file holding only the changes. Field names are stable within a `formatVersion`; this is version 6. Version 2 added `textEdits`, version 3 `addedRows` and `addedText`, version 4 `addedAssets`, version 5 `nodeChanges`, and version 6 `addedNodes`, links and `nodeRules`. Older files open unchanged, and are saved as version 6.
 
 ```json
 { "formatVersion": 6, "name": "FasterRecovery", "version": "1.0.0", "author": "", "description": "", "priority": 1000,
@@ -185,6 +185,12 @@ A project is a small JSON file holding only the changes. Field names are stable 
 - `addedText`: a new key in `namespace`, which must be `ST_GeneralLocalizeList`, the game's main string table. `text` holds a line per culture and must have `en`, which goes in the string table itself: every language without its own line shows it, as the game does for its own untranslated lines.
 - `nodeChanges`: a change to a step of a Flow graph, the game's scripts for story events, quests and tutorials. `asset` is the graph's `/Game` path and `node` the step's `NodeGuid`, as FModel or the Scripts tab's step id shows it. `kind`, when given, turns the step into another kind of step: fields the old and new kinds share keep their values and the old kind's others are dropped. Leave it out to keep the step's kind. `fields` sets the step's own fields: true or false, whole numbers, numbers, names, text and enum values so far. `outputs` renames the step's connected outputs, old name to new, so it still leads to the same next steps. `links` then points outputs at other steps (see below). Each kind names its outputs in its C++ class, so check another step of the same kind for them, as in `[<] Less than` or `Completed`. Steps made in Blueprint, like conversations, can't be changed yet, though graphs that contain them can.
 - `addedNodes`: a new step in a Flow graph. `node` is the id you give it, written like any `NodeGuid` and not already used in that graph; `kind` and `fields` work as in `nodeChanges`. `links` maps each output to the step it leads to. A link is a step id, which arrives at that step's `In` input, or `id:Input` for another input, and an empty link in `nodeChanges` removes the output's link. Links can lead to the game's own steps or to other new steps in the same graph. A new step only runs once something links to it, so wire it in with a `nodeChanges` link from the step before it.
+- `nodeRules`: one change for every step of kind `match`, in every script or only those whose folder starts with `folder` (as the Scripts tab groups them, such as `Tutorial` or `Event/PEV`), and only where each field in `where` has that value. An empty value in `where` means the step leaves the field at its default, which the game doesn't store. Each matching step changes as a `nodeChanges` entry with the rule's `kind`, `fields` and `outputs` would. A field value written as `{Path}`, such as `{Params[0].ID}`, copies that value from the step being changed. Rules are matched against the game at every build, so they also reach steps a game update adds. A step the project changes in `nodeChanges` is left to that change, a step two rules match goes to the first one listed, and a rule that matches nothing is a warning, not an error. For example, every tutorial window showing one tutorial turned into a quiet hint:
+
+  ```json
+  "nodeRules": [ { "match": "FlowNode_ShowTutorialWindow", "where": { "bUseArray": "" }, "kind": "FlowNode_TutorialGuide",
+                   "fields": { "bShow": "true", "bShowInfoMessage": "true" }, "outputs": { "Completed": "Out" } } ]
+  ```
 - `priority`: 1 to 9998, default 1000 when missing. The built files are named after `name` (letters, digits, dashes and underscores) plus `_<priority>_P`, so `FasterRecovery_1000_P`. Any priority makes the mod outrank the game's own patch; see [Mods that change the same files](#mods-that-change-the-same-files).
 
 ## Export formats
