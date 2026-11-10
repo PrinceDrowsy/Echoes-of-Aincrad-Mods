@@ -23,6 +23,8 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(AddedNode added, string problem) : this($"new step {added.Label}", problem, true) { }
 
+    public EditProblem(NodeRule rule, string problem, bool blocks = true) : this($"rule {rule.Label}", problem, blocks) { }
+
     public override string ToString() => $"{Change}: {Problem}";
 }
 
@@ -44,8 +46,8 @@ public static class ModBuilder
         var (plan, problems) = Plan(game, settings, project);
         var (text, textProblems) = PlanText(game, project, true);
         problems.AddRange(textProblems);
-        if (problems.Count > 0)
-            throw new EditException(string.Join(Environment.NewLine, problems));
+        if (problems.Any(p => p.Blocks))
+            throw new EditException(string.Join(Environment.NewLine, problems.Where(p => p.Blocks)));
 
         // An earlier build here could leave a container that this build, with no value changes, wouldn't replace.
         Directory.CreateDirectory(output);
@@ -141,7 +143,8 @@ public static class ModBuilder
 
         var sources = TableCatalog.Discover(game).ToDictionary(s => s.Id, StringComparer.OrdinalIgnoreCase);
         var mappings = new Usmap(settings.MappingsFile!);
-        var assets = new Dictionary<string, EditableAsset>();
+        // Paths load case-insensitively, so two spellings of one file must share one copy, or one would overwrite the other.
+        var assets = new Dictionary<string, EditableAsset>(StringComparer.OrdinalIgnoreCase);
         EditableAsset Asset(string file)
         {
             if (!assets.TryGetValue(file, out var asset))
@@ -216,6 +219,19 @@ public static class ModBuilder
                 continue;
             if (asset.Check(change) is { } problem)
                 problems.Add(new EditProblem(change, problem));
+            else
+                plan.Steps.Add(() => asset.Apply(change));
+        }
+
+        // A rule that matches nothing still builds, since a game update can retire steps, but it's worth a look.
+        var (ruled, ruleProblems, unmatched) = NodeRules.Expand(game, project);
+        problems.AddRange(ruleProblems.Select(p => new EditProblem(p.Rule, p.Problem)));
+        problems.AddRange(unmatched.Select(rule => new EditProblem(rule, "it matches no step in the game as it is now.", false)));
+        foreach (var (rule, change) in ruled)
+        {
+            var asset = Asset(AssetCopier.File(change.Asset));
+            if (asset.Check(change) is { } problem)
+                problems.Add(new EditProblem(rule, $"step {change.Node} in {change.Asset}: {problem}"));
             else
                 plan.Steps.Add(() => asset.Apply(change));
         }

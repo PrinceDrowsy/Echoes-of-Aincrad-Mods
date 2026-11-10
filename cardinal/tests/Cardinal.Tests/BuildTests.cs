@@ -208,6 +208,45 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
     }
 
     [Fact]
+    public void StepRulesChangeEveryMatchingStep()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        // Every tutorial window that shows one tutorial becomes a quiet hint; ones listing several are left alone.
+        var quiet = new Dictionary<string, string> { ["bShow"] = "true", ["bShowInfoMessage"] = "true" };
+        var outputs = new Dictionary<string, string> { ["Completed"] = "Out" };
+        var plain = new NodeRule("FlowNode_ShowTutorialWindow", null, new() { ["bUseArray"] = "" }, "FlowNode_TutorialGuide", quiet, outputs);
+        var listed = new NodeRule("FlowNode_ShowTutorialWindow", null, new() { ["bUseArray"] = "true", ["Params[1]"] = "" },
+            "FlowNode_TutorialGuide", new(quiet) { ["TutorialCategory"] = "{Params[0].Category}", ["TutorialID"] = "{Params[0].ID}" }, outputs);
+        var project = new ModProject { Name = "Rules" };
+        project.SetRule(plain);
+        project.SetRule(listed);
+
+        var (changes, problems, unmatched) = NodeRules.Expand(game, project);
+        Assert.Empty(problems);
+        Assert.Empty(unmatched);
+        Assert.Equal(16, changes.Count(c => c.Rule == plain));
+        Assert.Equal(14, changes.Count(c => c.Rule == listed));
+        Assert.All(changes.Where(c => c.Rule == listed), c => Assert.StartsWith("ETutorialCategory::", c.Change.Fields["TutorialCategory"]));
+
+        // A step the project changes by hand is left to that change.
+        const string guard = "2DB3554C-4DB8679E-01354D89-95299F90";
+        var own = changes.Single(c => c.Change.Node == guard).Change;
+        project.SetNode(own with { Fields = new(quiet) { ["bShow"] = "false" } });
+        Assert.DoesNotContain(NodeRules.Expand(game, project).Changes, c => c.Change.Node == guard);
+
+        var built = new ModProject { Name = "GuardRule" };
+        built.SetRule(plain with { Folder = "Event/PEV/pev_01_01_17" });
+        built.SetRule(plain with { Match = "FlowNode_Nothing" });
+        Assert.False(Assert.Single(ModBuilder.Check(game, fixture.Settings, built)).Blocks);
+        ModBuilder.Install(game, fixture.Settings, built, false);
+
+        using var modded = Game.Open(fixture.Settings, true);
+        var script = Script.Load(modded, Script.List(modded).Single(s => s.Name == "Flow_pev_01_01_17"));
+        Assert.Equal("FlowNode_TutorialGuide", script.Steps.Single(s => s.Id == guard).Kind);
+    }
+
+    [Fact]
     public void ModsAtOnePriorityTieUntilMerged()
     {
         var game = fixture.Require();

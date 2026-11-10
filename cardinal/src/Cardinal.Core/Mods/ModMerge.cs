@@ -65,6 +65,11 @@ public static class ModMerge
                 Add(rows, "step " + change.Label, project.Name, Describe(change.Kind ?? "same kind", change.Fields, change.Links));
                 merged.SetNode(change);
             }
+            foreach (var rule in project.NodeRules)
+            {
+                Add(rows, "rule " + rule.Label, project.Name, Describe(rule.Kind ?? "same kind", rule.Fields, null));
+                merged.SetRule(rule);
+            }
             foreach (var added in project.AddedNodes)
             {
                 Add(rows, "new step " + added.Label, project.Name, Describe(added.Kind, added.Fields, added.Links));

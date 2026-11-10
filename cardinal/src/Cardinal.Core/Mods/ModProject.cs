@@ -92,6 +92,19 @@ public sealed record NodeChange(string Asset, string Node, string? Kind, Diction
 /// use. Links maps each of its outputs to the step it leads to: a step id arrives at that step's In pin, and
 /// "id:Pin" at another one.
 /// </summary>
+/// <summary>
+/// A change made to every step of kind Match, in every script or only those in Folder, whose fields have the values in
+/// Where. It changes each one as a NodeChange with Kind, Fields and Outputs would, so it also reaches steps a game update
+/// adds. A field value written as {Path}, such as {Params[0].ID}, copies that value from the step being changed.
+/// </summary>
+public sealed record NodeRule(string Match, string? Folder, Dictionary<string, string>? Where, string? Kind,
+    Dictionary<string, string> Fields, Dictionary<string, string> Outputs)
+{
+    [JsonIgnore]
+    public string Label => Match + (Folder is { Length: > 0 } ? $" in {Folder}" : "")
+                           + string.Concat((Where ?? []).Select(w => $", {w.Key} {(w.Value.Length > 0 ? w.Value : "unset")}"));
+}
+
 public sealed record AddedNode(string Asset, string Node, string Kind, Dictionary<string, string> Fields,
     Dictionary<string, string> Links)
 {
@@ -103,7 +116,7 @@ public sealed record AddedNode(string Asset, string Node, string Kind, Dictionar
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
 /// Format 2 added text edits, format 3 added rows and text, format 4 copied assets, format 5 changed Flow steps, and
-/// format 6 added Flow steps and links; older files load unchanged.
+/// format 6 added Flow steps, links and step rules; older files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
@@ -135,6 +148,7 @@ public sealed partial class ModProject
     public List<AssetCopy> AddedAssets { get; set; } = [];
     public List<NodeChange> NodeChanges { get; set; } = [];
     public List<AddedNode> AddedNodes { get; set; } = [];
+    public List<NodeRule> NodeRules { get; set; } = [];
 
     /// <summary>Every change of every kind.</summary>
     [JsonIgnore]
@@ -146,7 +160,7 @@ public sealed partial class ModProject
 
     /// <summary>Changes made inside the game's own assets.</summary>
     [JsonIgnore]
-    public int AssetChanges => Edits.Count + AddedRows.Count + AddedText.Count + NodeChanges.Count + AddedNodes.Count;
+    public int AssetChanges => Edits.Count + AddedRows.Count + AddedText.Count + NodeChanges.Count + AddedNodes.Count + NodeRules.Count;
 
     public static ModProject Load(string path)
     {
@@ -281,6 +295,15 @@ public sealed partial class ModProject
 
     public bool RemoveAddedNode(string asset, string node) =>
         FindAddedNode(asset, node) is { } added && AddedNodes.Remove(added);
+
+    /// <summary>Adds the rule, replacing an earlier one for the same steps.</summary>
+    public void SetRule(NodeRule rule)
+    {
+        if (NodeRules.FirstOrDefault(r => r.Label == rule.Label) is { } old)
+            NodeRules[NodeRules.IndexOf(old)] = rule;
+        else
+            NodeRules.Add(rule);
+    }
 
     /// <summary>
     /// The name the built files get: BaseName(), then the priority and _P.
