@@ -193,8 +193,7 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
         ModBuilder.Install(game, fixture.Settings, project, false);
 
         using var modded = Game.Open(fixture.Settings, true);
-        // The game lists some graphs twice, under folders spelled in different case; this is the file the mod replaced.
-        var script = Script.Load(modded, Script.List(modded).First(s => s.File == AssetCopier.File(graph)));
+        var script = Script.Load(modded, Script.List(modded).Single(s => s.Package.Equals(graph, StringComparison.OrdinalIgnoreCase)));
         ScriptStep Step(string id) => script.Steps.Single(s => s.Id == id);
         Assert.Equal(check, Assert.Single(Step(tutorial).Links).To);
         var checkStep = Step(check);

@@ -82,6 +82,7 @@ public class GameTests(GameFixture fixture)
         var game = fixture.Require();
         var scripts = Script.List(game);
         Assert.True(scripts.Count >= 500, $"only {scripts.Count} scripts");
+        Assert.Equal(scripts.Count, scripts.Select(s => s.File).Distinct(StringComparer.OrdinalIgnoreCase).Count());
         var guard = scripts.Single(s => s.Name == "Flow_pev_01_01_17");
         Assert.Equal("/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17", guard.Package);
 

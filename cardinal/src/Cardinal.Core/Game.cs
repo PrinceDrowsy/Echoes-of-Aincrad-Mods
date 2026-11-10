@@ -100,10 +100,13 @@ public sealed class Game : IDisposable
     /// <summary>A main string table key's own English, before any language's line replaces it.</summary>
     public string? SourceText(string key) => sourceText.GetValueOrDefault(key);
 
+    // The same file can be listed more than once, by containers that ship it again or spell a folder in another case;
+    // paths load case-insensitively, so every spelling opens the one file.
     public IEnumerable<string> FindFiles(string folder, string extension) =>
         Provider.Files.Keys
             .Where(path => path.StartsWith(ContentRoot + folder, StringComparison.OrdinalIgnoreCase)
                            && path.EndsWith(extension, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase);
 
     public IPackage Package(string path) => Provider.LoadPackage(path);
