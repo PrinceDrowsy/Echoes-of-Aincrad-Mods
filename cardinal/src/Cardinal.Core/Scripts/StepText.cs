@@ -130,8 +130,9 @@ public sealed partial class StepText(Game game, Locres language)
             "CinematicMode" => "Cutscene mode: " + string.Join(", ", CinematicSwitches
                 .Where(s => f[s.Field] is not null)
                 .Select(s => Enum(f[s.Field]) == "Disable" ? s.Off : s.On)) + ".",
-            "SpawnCastCharacter" => $"{Character(f["ID"]!.ToString())} appears.",
-            "DestroyCastCharacter" => $"{Character(f["ID"]!.ToString())} leaves.",
+            // A step left at its class's default number doesn't store it, and that default is in the game's code.
+            "SpawnCastCharacter" => $"{(f["ID"] is { } spawned ? Character(spawned.ToString()) : "Someone")} appears.",
+            "DestroyCastCharacter" => $"{(f["ID"] is { } leaving ? Character(leaving.ToString()) : "Someone")} leaves.",
             "PlayAnimation" => $"{Who(f["Target"])} moves ({AssetName(f["Montage"])}).",
             "LookAt" => $"{Who(f["Target"])} looks at {Object(Who(f["LookAtTarget"]))}.",
             "SetEmotion" => $"{Who(f["Target"])} looks {Enum(f["Emotion"])?.TrimEnd('0', '1', '2', '3').ToLowerInvariant()}.",
