@@ -307,6 +307,15 @@ local PLAY_FLOW = "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_
 cheat(Key.E, "play " .. PLAY_FLOW:match("[^/]+$"), function()
     local flow = LoadAsset(PLAY_FLOW .. "." .. PLAY_FLOW:match("[^/]+$"))
     FindFirstOf("FlowSubsystem"):StartRootFlow(FindFirstOf("RODInGamePlayerController"), flow, true)
+    -- Where the script got to: a talk step that never finishes stays active.
+    ExecuteWithDelay(2000, function()
+        ExecuteInGameThread(function()
+            for _, talk in ipairs(FindAllOf("FlowNode_Talk_C") or {}) do
+                log(string.format("%s: %s, text %s", talk:GetFullName(), tostring(talk.ActivationState),
+                    talk.TextID:ToString()))
+            end
+        end)
+    end)
 end)
 
 -- What a giver's conversation does besides handing out the quest. Throwaway saves only, like the story jump.
