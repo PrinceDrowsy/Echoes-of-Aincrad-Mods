@@ -37,8 +37,17 @@ public sealed class EditableAsset
         {
             var path = Retoc.Extract(settings, file, work);
             var asset = new UAsset(path, EngineVersion.VER_UE5_3, mappings);
+            // The mappings only describe native classes. UAssetAPI reads a Blueprint's fields from the Blueprint's own
+            // package when it sits beside the asset, as conversation steps need.
+            var blueprints = asset.Exports.OfType<RawExport>().Select(e => BlueprintPackage(asset, e)).OfType<string>().Distinct().ToList();
+            if (blueprints.Count > 0)
+            {
+                foreach (var package in blueprints)
+                    Retoc.Extract(settings, Game.ContentRoot + package["/Game/".Length..] + ".uasset", work);
+                asset = new UAsset(path, EngineVersion.VER_UE5_3, mappings);
+            }
             // An export UAssetAPI can't decode is written back byte for byte, so it only blocks changes made inside it.
-            // Flow graphs often have Blueprint steps the mappings don't describe; Change checks its own step instead.
+            // Change checks its own step instead.
             var raw = asset.Exports.OfType<RawExport>().FirstOrDefault();
             return new EditableAsset(file, asset, raw is null
                 ? null
@@ -50,6 +59,13 @@ public sealed class EditableAsset
             Directory.Delete(work, true);
         }
     }
+
+    static string? BlueprintPackage(UAsset asset, RawExport export) =>
+        export.ClassIndex.IsImport() && export.ClassIndex.ToImport(asset) is { ClassName.Value.Value: "BlueprintGeneratedClass" } import
+        && import.OuterIndex.IsImport() && import.OuterIndex.ToImport(asset).ObjectName.ToString() is { } package
+        && package.StartsWith("/Game/")
+            ? package
+            : null;
 
     public static string WorkFolder()
     {
@@ -191,7 +207,7 @@ public sealed class EditableAsset
         var guid = UnrealGuid(change.Node);
         var node = asset.Exports.OfType<NormalExport>().FirstOrDefault(e => NodeGuid(e) == guid)
                    ?? throw new EditException(asset.Exports.OfType<RawExport>().Any()
-                       ? $"There's no step {change.Node} that Cardinal can read in {Path.GetFileName(File)}. Steps made in Blueprint, like conversations, can't be changed yet."
+                       ? $"There's no step {change.Node} that Cardinal can read in {Path.GetFileName(File)}. A few steps made in Blueprint, like the test dialogs, can't be changed yet."
                        : $"There's no step {change.Node} in {Path.GetFileName(File)}.");
         var kind = change.Kind ?? Import(node.ClassIndex).ObjectName.ToString();
         var fields = StepFields(kind);

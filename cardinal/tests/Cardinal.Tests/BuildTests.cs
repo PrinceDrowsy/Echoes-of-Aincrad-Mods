@@ -208,6 +208,28 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
     }
 
     [Fact]
+    public void ConversationStepsCanBeChanged()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        // Iori's line in the beta, a Talk step made in Blueprint, given another line.
+        const string graph = "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17";
+        const string talk = "A7552243-4FA62A8B-5E0018B7-EC268813";
+        var project = new ModProject { Name = "Talk" };
+        project.SetNode(new NodeChange(graph, talk, null, new() { ["TextID"] = "Main_pev_01_01_17_00200" }, []));
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+
+        using var modded = Game.Open(fixture.Settings, true);
+        var script = Script.Load(modded, Script.List(modded).Single(s => s.Package.Equals(graph, StringComparison.OrdinalIgnoreCase)));
+        var step = script.Steps.Single(s => s.Id == talk);
+        Assert.Equal("Main_pev_01_01_17_00200", (string?)step.Fields["TextID"]);
+        Assert.Equal("EFlowTarget::Partner", (string?)step.Fields["Target"]!["Target"]);
+        Assert.EndsWith("DA_Main_pev_01_01_17.0", (string?)step.Fields["EventTalkData"]!["ObjectPath"]);
+        Assert.Equal("E9FC9F38-4355D340-8DF9C38A-8CFCCB83", Assert.Single(step.Links).To);
+    }
+
+    [Fact]
     public void StepRulesChangeEveryMatchingStep()
     {
         var game = fixture.Require();
