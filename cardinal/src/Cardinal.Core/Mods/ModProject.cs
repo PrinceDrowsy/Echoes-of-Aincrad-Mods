@@ -88,11 +88,6 @@ public sealed record NodeChange(string Asset, string Node, string? Kind, Diction
 }
 
 /// <summary>
-/// A new step in a Flow graph. Node is the id it gets, written like any step's NodeGuid, which links from other steps
-/// use. Links maps each of its outputs to the step it leads to: a step id arrives at that step's In pin, and
-/// "id:Pin" at another one.
-/// </summary>
-/// <summary>
 /// A change made to every step of kind Match, in every script or only those in Folder, whose fields have the values in
 /// Where. It changes each one as a NodeChange with Kind, Fields and Outputs would, so it also reaches steps a game update
 /// adds. A field value written as {Path}, such as {Params[0].ID}, copies that value from the step being changed.
@@ -105,6 +100,11 @@ public sealed record NodeRule(string Match, string? Folder, Dictionary<string, s
                            + string.Concat((Where ?? []).Select(w => $", {w.Key} {(w.Value.Length > 0 ? w.Value : "unset")}"));
 }
 
+/// <summary>
+/// A new step in a Flow graph. Node is the id it gets, written like any step's NodeGuid, which links from other steps
+/// use. Links maps each of its outputs to the step it leads to: a step id arrives at that step's In pin, and
+/// "id:Pin" at another one.
+/// </summary>
 public sealed record AddedNode(string Asset, string Node, string Kind, Dictionary<string, string> Fields,
     Dictionary<string, string> Links)
 {
