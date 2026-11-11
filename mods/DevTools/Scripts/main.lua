@@ -193,6 +193,113 @@ cheat(Key.NINE, "set story to the hand mirror scene", function()
     setStory(MIRROR_STORY)
 end)
 
+-- Experiment for Two Faces: loads the creator's level directly, as the mirror event's ChangeLevel does. The
+-- creator moves the story to 24000 when the look is confirmed and to 25000 after the tunnel, so the step it was opened
+-- from is kept to go back to.
+local returnStory
+
+-- The world's game state isn't there in the title or creator levels, but the game instance outlives every level.
+local function savedStory()
+    local instance = FindFirstOf("RODGameInstance")
+    return instance and instance:IsValid() and instance:GetMainStoryProgress()
+end
+
+-- The playing character's entry in the save data in memory, which the save subsystem keeps across every level.
+local function characterSave()
+    local characters = FindFirstOf("RODSaveLoadSubsystem").CurrentSaveGame.CharacterSaveData
+    local slot = FindFirstOf("RODGameInstance").CurrentCharacterSlotIndex
+    characters:ForEach(function(index, character)
+        log("save slot " .. index - 1 .. " story " .. character:get().MainStoryProgress
+            .. (index - 1 == slot and ", playing" or ""))
+    end)
+    return characters[slot + 1]
+end
+
+cheat(Key.ZERO, "open the character creator level", function(state)
+    returnStory = FindFirstOf("RODGameState").MainStoryProgress
+    log("story progress is " .. returnStory .. ", saved " .. characterSave().MainStoryProgress)
+    -- A candidate for where the beta model's look comes from, since HeroData's initial avatar isn't it.
+    local default = FindFirstOf("RODSaveLoadSubsystem").DefaultUserInfo
+    if default:IsValid() then
+        local look = default:GetAvatarData()
+        log("default user info head gear " .. look.AvatarPartsData.HeadGearID .. " pupil " .. look.AppearanceData.Pupil)
+    else
+        log("no default user info")
+    end
+    local statics = StaticFindObject("/Script/Engine.Default__GameplayStatics")
+    statics:OpenLevel(state, FName("/Game/ROD/Maps/Main/ROD/PL_CharacterMake"), true, "")
+end)
+
+-- The creator's story moves happen in native code, and the creator level has no game state, but the save data in
+-- memory outlives every level. StartNextQuest loads the new step's story asset, and the world takes its quest from
+-- that asset, so both the step and the asset are set back once it has loaded, before the world does.
+RegisterHook("/Script/ROD.RODAvaterCustomizeFlowManager:OnMainStoryChangedDelegate", function()
+    if not returnStory then
+        return
+    end
+    local instance = FindFirstOf("RODGameInstance")
+    local character = characterSave()
+    log("saved story " .. character.MainStoryProgress .. ", story asset " .. instance:GetMainStoryAsset():GetFullName())
+    character.MainStoryProgress = returnStory
+    local name = "MainStory_" .. returnStory
+    instance.MainStoryAsset = LoadAsset("/Game/ROD/DataAssets/Story/Main/" .. name .. "." .. name)
+    log("set back to " .. returnStory .. ", story asset " .. instance:GetMainStoryAsset():GetFullName()
+        .. ", game instance story " .. tostring(savedStory()))
+    returnStory = nil
+end)
+
+-- Until GameConfig.InitialAvatarProgress the game shows HeroData's initial avatar instead of the saved look, and the
+-- data leaves it empty for the built-in default. Filling it with the look just made shows that as the beta avatar.
+-- The creator level hasn't loaded HeroData, so it's loaded here, and filled again in the world in case the edit
+-- didn't survive the level change.
+local HERO_DATA = "/Game/ROD/DataAssets/Character/Avatar/AvatarData/HeroData.HeroData"
+local betaLook = false
+
+local function showBetaLook(where)
+    local look = characterSave().AvatarData
+    local hero = StaticFindObject(HERO_DATA)
+    if not hero:IsValid() then
+        log("loading hero data in the " .. where)
+        hero = LoadAsset(HERO_DATA)
+    end
+    hero.InitialAvatarVoice = look.Voice
+    hero.InitialAvatarPartsData = look.AvatarPartsData
+    hero.InitialAvatarAppearanceData = look.AppearanceData
+    log(string.format("%s: initial avatar head gear %s pupil %s, saved look head gear %s pupil %s", where,
+        hero.InitialAvatarPartsData.HeadGearID, hero.InitialAvatarAppearanceData.Pupil,
+        look.AvatarPartsData.HeadGearID, look.AppearanceData.Pupil))
+end
+
+RegisterHook("/Script/ROD.RODAvaterCustomizeFlowManager:FinishCreateAvatarDataBegin", function()
+    if returnStory then
+        betaLook = true
+        showBetaLook("creator")
+    end
+end)
+
+-- The story the world loads with, to see whether the step that was set back held, and the beta look filled in again.
+NotifyOnNewObject("/Script/ROD.RODInGamePlayerController", function()
+    log("world controller created at story " .. tostring(savedStory()))
+    ExecuteInGameThread(function()
+        -- Whatever the creator passed with the level change, such as the quest to start.
+        log("level options " .. FindFirstOf("GameModeBase").OptionsString:ToString())
+        if betaLook then
+            showBetaLook("world")
+        end
+    end)
+    if betaLook then
+        -- Whether the filled-in HeroData is still the one in memory once the hero has spawned, or was collected and
+        -- loaded again from disk.
+        ExecuteWithDelay(10000, function()
+            ExecuteInGameThread(function()
+                local hero = StaticFindObject(HERO_DATA)
+                log("hero data later: " .. (hero:IsValid() and "initial head gear "
+                    .. hero.InitialAvatarPartsData.HeadGearID or "not loaded"))
+            end)
+        end)
+    end
+end)
+
 -- What a giver's conversation does besides handing out the quest. Throwaway saves only, like the story jump.
 cheat(Key.EIGHT, "set side story " .. SET_SIDE_STORY.ID .. " to " .. SET_SIDE_STORY.Progress, function()
     FindFirstOf("RODInGamePlayerController"):ServerDebugSetSubStoryProgress(FName(SET_SIDE_STORY.ID), SET_SIDE_STORY.Progress)
@@ -210,6 +317,26 @@ end)
 RegisterKeyBind(Key.F12, { ModifierKey.CONTROL }, function()
     log("mark")
 end)
+
+-- Logs each step the title, name entry and creator flows start, to see where a New Game could open the creator.
+local FLOW_STEPS = {
+    RODOutGameFlowManager = { "Attention", "AboutAutoSave", "PlayerNameEntry", "CharaDataSave",
+        "CheckChunk1InstallComplete", "AvatarCustomize", "PreTitleEvent", "Title", "PostTitleEvent", "GenerateSaveData",
+        "CheckDemoSaveData" },
+    RODPlayerNameEntryFlowManager = { "Headsup", "NameEntry", "DifficultySelect", "GameModeSelect", "PrologueSkip",
+        "TransferMessage" },
+    RODAvaterCustomizeFlowManager = { "CheckAvaterData", "LoadAvater", "ArgusLogo", "OpenAvaterCustomizeMenu",
+        "CreateAvatarData", "FinishCreateAvatarData", "StartDirectionApplication", "SelectApplication",
+        "StartDirectionPlayGame", "StartNextQuest" },
+}
+
+for class, steps in pairs(FLOW_STEPS) do
+    for _, step in ipairs(steps) do
+        RegisterHook("/Script/ROD." .. class .. ":" .. step .. "Begin", function()
+            log("flow " .. class .. " " .. step .. " at story " .. tostring(savedStory()))
+        end)
+    end
+end
 
 -- When and from which story step the character creator takes over, for opening it at other points.
 for _, class in ipairs({ "/Script/ROD.RODGameMode_AvatarCustomize", "/Script/ROD.RODAvaterCustomizeFlowManager",
