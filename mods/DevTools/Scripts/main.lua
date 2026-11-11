@@ -300,6 +300,15 @@ NotifyOnNewObject("/Script/ROD.RODInGamePlayerController", function()
     end
 end)
 
+-- A Flow graph (event, quest or tutorial script) to play on the spot, for testing changes to one without reaching
+-- it in the story. Events play out of their story context, so throwaway saves only.
+local PLAY_FLOW = "/Game/ROD/Flow/FlowGraphs/Event/PEV/pev_01_01_17/Flow_pev_01_01_17"
+
+cheat(Key.E, "play " .. PLAY_FLOW:match("[^/]+$"), function()
+    local flow = LoadAsset(PLAY_FLOW .. "." .. PLAY_FLOW:match("[^/]+$"))
+    FindFirstOf("FlowSubsystem"):StartRootFlow(FindFirstOf("RODInGamePlayerController"), flow, true)
+end)
+
 -- What a giver's conversation does besides handing out the quest. Throwaway saves only, like the story jump.
 cheat(Key.EIGHT, "set side story " .. SET_SIDE_STORY.ID .. " to " .. SET_SIDE_STORY.Progress, function()
     FindFirstOf("RODInGamePlayerController"):ServerDebugSetSubStoryProgress(FName(SET_SIDE_STORY.ID), SET_SIDE_STORY.Progress)
