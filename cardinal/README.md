@@ -64,6 +64,14 @@ The game only finds towns, quests and other primary assets through its asset reg
 
 Removing a mod that added a town, quest or item leaves saves that still load: the game drops what it can't find.
 
+## Adding creator parts
+
+New pupils, eyebrows, eyelines, noses and jaws go in as new options at the end of the character creator's lists, instead of replacing the game's own. A creator option is three things: a row in the kind's parts table (such as `Avatar/PupilParts`) and its thumbnail table (`Other/DT_Pupil`), both holding the part's ID, and a mesh named after that ID, `SK_CHR_PUP030` for pupil 30, listed in the kind's mesh list (`AvatarMesh_Pupil`). The game finds the mesh by the number in its name among the listed meshes, so a mesh the list doesn't name shows nothing.
+
+`new part` adds all of it. It starts the new part as a copy of an existing one, mesh included, so it works in game straight away, and takes the next free ID: the game ships meshes for some numbers it doesn't offer, such as pupils 17 to 29, so those are skipped. To give a part a mesh of your own, ship it under the part's name on the game's head skeleton and add the part with `--own-mesh`, which leaves out the copy. The thumbnail starts as the copied part's; set `ThumbnailTexture` in its parts row to change it.
+
+Every part mod changes the same creator files, so two part mods replace each other's copies of them. Merge them to keep both: their meshes all go into the lists, since list items never clash. Hair is built differently and isn't covered yet.
+
 ## Mods that change the same files
 
 A mod replaces whole game files, so two mods that change the same file can't both work: the game loads one copy and ignores the other. Which one it loads is decided by the number before `_P` in the file name, the patch priority. Higher wins, equal priorities are left to chance, and a name ending in just `_P` ranks the same as the game's own update (`pakchunk0-WindowsClient_0_P`), so that's left to chance too.
@@ -109,6 +117,7 @@ Cardinal.exe check PROJECT.json
 Cardinal.exe merge A.json B.json [C.json...] --out DIR
 Cardinal.exe merge A.json B.json [C.json...] --install [--force] [--remove-single-builds]
 Cardinal.exe new town PROJECT.json --from ROW --name TEXT [--id ID]
+Cardinal.exe new part PROJECT.json --kind KIND --from ID [--id ID] [--own-mesh]
 Cardinal.exe new asset PROJECT.json FROM PACKAGE
 Cardinal.exe patch
 Cardinal.exe conflicts
@@ -129,8 +138,9 @@ Cardinal.exe help
 - `diagnostics` prints the same report as the window's **Copy diagnostic info**.
 - `new town` adds a town that starts as a copy of `DT_TownList` row `ROW`; see [New assets and the registry patch](#new-assets-and-the-registry-patch). Without `--id` it takes the next free town ID. `set` changes fields of rows the project adds as well, such as a new town's `StoryProgress`.
 - `new asset` adds a copy of the game asset `FROM` as `PACKAGE`, both `/Game` paths; see [New assets and the registry patch](#new-assets-and-the-registry-patch). `patch` rebuilds the registry patch from every installed mod and lists each new asset; problems exit with 5.
+- `new part` adds a creator option of `KIND` (`pupil`, `eyebrow`, `eyeline`, `nose` or `jaw`) that starts as a copy of part `ID`; see [Adding creator parts](#adding-creator-parts). Without `--id` it takes the next free ID.
 - `new item` adds an item to the project; see [Adding items](#adding-items). `--category` is the item table, such as `Items/UseItem`, and is needed when `ROW` is an ID in more than one. Without `--id` it takes the next free ID. For text the project adds, `text set` sets one language's line, and empty text makes that language show the English again.
-- `set`, `text set`, `text import`, `new item`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
+- `set`, `text set`, `text import`, `new item`, `new part`, `check`, `build` and `merge` always work from the unmodded game and refuse `--with-mods`.
 
 Output goes to stdout, errors to stderr. Exit codes:
 
