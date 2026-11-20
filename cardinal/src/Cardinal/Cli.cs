@@ -498,7 +498,7 @@ static class Cli
     sealed class Options
     {
         static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds", "real-names", "own-mesh"];
-        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project", "from", "id", "name", "description", "category"];
+        static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project", "from", "id", "name", "description", "category", "kind"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.
         public List<string> Words { get; } = [];
