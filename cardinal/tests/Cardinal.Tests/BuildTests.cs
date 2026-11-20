@@ -129,6 +129,32 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
     }
 
     [Fact]
+    public void AnAssetPathCanBeSet()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        const string pupils = "Avatar/PupilParts";
+        const string second = "/Game/ROD/Widget/AvatarCustomize/Texture/Thumbnail/Pupil/T_Avatar_Thumbnail_Pupil2.T_Avatar_Thumbnail_Pupil2";
+        string Thumbnail(Game from)
+        {
+            var table = TableCatalog.Discover(from).Single(s => s.Id == pupils).Load(from);
+            return Table.Cell(table.Field(table.Rows.ToList().FindIndex(r => r.Key == "1"), "ThumbnailTexture")!);
+        }
+        Assert.NotEqual(second, Thumbnail(game));
+
+        var rejected = new ModProject { Name = "Wrong" };
+        rejected.Set(new ModEdit(pupils, "1", "ThumbnailTexture", "T_Avatar_Thumbnail_Pupil2"));
+        Assert.True(Assert.Single(ModBuilder.Check(game, fixture.Settings, rejected)).Blocks);
+
+        var project = new ModProject { Name = "Thumbnail" };
+        project.Set(new ModEdit(pupils, "1", "ThumbnailTexture", second));
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+        using var modded = Game.Open(fixture.Settings, true);
+        Assert.Equal(second, Thumbnail(modded));
+    }
+
+    [Fact]
     public void AFlowStepCanBecomeAnotherKind()
     {
         var game = fixture.Require();

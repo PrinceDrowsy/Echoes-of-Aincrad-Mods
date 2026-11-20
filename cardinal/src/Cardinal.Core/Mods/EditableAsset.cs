@@ -578,6 +578,14 @@ public sealed class EditableAsset
                 var small = byte.TryParse(text, NumberStyles.Integer, invariant, out var b8) ? b8 : throw Expected("a whole number from 0 to 255", property);
                 if (commit) plainByte.Value = small;
                 break;
+            case SoftObjectPropertyData soft:
+                var path = AssetPath(text, property);
+                if (commit) soft.Value = SoftPath(path);
+                break;
+            case StructPropertyData { Value: [SoftObjectPathPropertyData softPath] }:
+                var structPath = AssetPath(text, property);
+                if (commit) softPath.Value = SoftPath(structPath);
+                break;
             case ArrayPropertyData list:
                 if (text.Trim() != "[]")
                     throw Expected("[] to empty it, the only change Cardinal can make to a list so far", property);
@@ -608,6 +616,19 @@ public sealed class EditableAsset
         }
         return value;
     }
+
+    // An asset path as tables show it, /Game/Folder/Name.Name, or without the .Name. The game stores the package and the
+    // asset's name apart.
+    static (string Package, string Name) AssetPath(string text, PropertyData property)
+    {
+        if (!text.StartsWith("/Game/") || text.EndsWith('/'))
+            throw Expected("an asset path like /Game/ROD/CHR/Humans/Heads/PUP/SK_CHR_PUP001", property);
+        var dot = text.LastIndexOf('.');
+        var package = dot < 0 ? text : text[..dot];
+        return (package, dot < 0 ? package[(package.LastIndexOf('/') + 1)..] : text[(dot + 1)..]);
+    }
+
+    FSoftObjectPath SoftPath((string Package, string Name) path) => new(Name(path.Package), Name(path.Name), null);
 
     static EditException Expected(string what, PropertyData property) => new($"{property.Name} needs {what}.");
 }
