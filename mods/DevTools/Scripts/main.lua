@@ -336,6 +336,19 @@ RegisterKeyBind(Key.F12, { ModifierKey.CONTROL }, function()
     log("mark")
 end)
 
+-- Which face part meshes are showing, to see how a part ID picks its mesh. Works in the creator, which has no player
+-- controller.
+RegisterKeyBind(Key.F3, { ModifierKey.CONTROL }, function()
+    ExecuteInGameThread(function()
+        for _, component in ipairs(FindAllOf("SkeletalMeshComponent") or {}) do
+            local mesh = component.SkeletalMesh
+            if mesh and mesh:IsValid() and mesh:GetFullName():find("/Humans/Heads/") then
+                log("part " .. mesh:GetFullName():match("[^.]+$") .. " on " .. component:GetOuter():GetFullName():match("[^.:]+$"))
+            end
+        end
+    end)
+end)
+
 -- Logs each step the title, name entry and creator flows start, to see where a New Game could open the creator.
 local FLOW_STEPS = {
     RODOutGameFlowManager = { "Attention", "AboutAutoSave", "PlayerNameEntry", "CharaDataSave",
