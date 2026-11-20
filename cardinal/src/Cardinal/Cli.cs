@@ -47,6 +47,11 @@ static class Cli
           new town PROJECT --from ROW --name TEXT [--id ID]
                 Adds a town that starts as a copy of DT_TownList row ROW, with its own town ID (the next free one
                 if left out) and English name, and a copy of that town's Town_ asset.
+          new part PROJECT --kind KIND --from ID [--id ID] [--own-mesh]
+                Adds a character creator option of KIND (pupil, eyebrow, eyeline, nose or jaw) that starts as a
+                copy of part ID, with its own ID (the next free one if left out), rows for its tile and its mesh
+                in the kind's mesh list. The mesh is a copy of the starting part's, or, with --own-mesh, one the
+                mod ships itself under the part's name.
           new asset PROJECT FROM PACKAGE
                 Adds a copy of the game asset FROM as the new asset PACKAGE, both /Game paths, such as
                 /Game/ROD/DataAssets/Town/Town_004 and /Game/ROD/DataAssets/Town/Town_011.
@@ -74,7 +79,7 @@ static class Cli
 
         --paks, --key, --usmap and --oodle also work on any command, for that run only.
         --with-mods reads the game as installed mods change it (Paks\~mods) instead of unmodded.
-        set, text set, text import, new item, new town, new asset, check, build and merge always work from the unmodded game.
+        set, text set, text import, new item, new town, new part, new asset, check, build and merge always work from the unmodded game.
 
         Exit codes: 0 ok, 1 bad arguments or a change that can't be made, 2 setup missing or wrong,
         3 a game file couldn't be read, 4 writing failed or a build is already installed,
@@ -108,6 +113,7 @@ static class Cli
                 3 when Word(0) == "export" && Word(1) == "map" => WithGame(options, (game, _) => ExportMap(game, w[2], options)),
                 3 when Word(0) == "new" && Word(1) == "item" => WithUnmoddedGame(options, (game, settings) => NewItem(game, settings, w[2], options)),
                 3 when Word(0) == "new" && Word(1) == "town" => WithUnmoddedGame(options, (game, settings) => NewTown(game, settings, w[2], options)),
+                3 when Word(0) == "new" && Word(1) == "part" => WithUnmoddedGame(options, (game, settings) => NewPart(game, settings, w[2], options)),
                 5 when Word(0) == "new" && Word(1) == "asset" => WithUnmoddedGame(options, (game, _) => NewAsset(game, w[2], w[3], w[4])),
                 1 when Word(0) == "patch" => Guarded(() => Patch(options.Apply(Settings.Load()))),
                 6 when Word(0) == "set" => WithUnmoddedGame(options, (game, settings) => SetValue(game, settings, w[1], w[2], w[3], w[4], w[5])),
@@ -384,6 +390,21 @@ static class Cli
         return Lines(notes);
     }
 
+    static int NewPart(Game game, Settings settings, string projectPath, Options options)
+    {
+        var sources = TableCatalog.Discover(game);
+        var kind = PartTemplate.Kind(options.Required("kind"));
+        var from = int.TryParse(options.Required("from"), out var start) ? start : throw new ArgumentException("--from needs a part ID.");
+        var project = OpenOrNew(projectPath);
+        var id = options.Value("id") is { } text
+            ? int.TryParse(text, out var parsed) ? parsed : throw new ArgumentException("--id needs a whole number.")
+            : PartTemplate.NextId(game, sources.Single(s => s.Id == kind.Parts).Load(game), project, kind);
+        var notes = PartTemplate.Add(game, settings, project, sources, new NewPart(kind.Name, from, id, options.Has("own-mesh")));
+        project.Save(projectPath);
+        Console.WriteLine($"Added {kind.Name} {id} to {projectPath}.");
+        return Lines(notes);
+    }
+
     static int NewAsset(Game game, string projectPath, string from, string package)
     {
         var project = OpenOrNew(projectPath);
@@ -476,7 +497,7 @@ static class Cli
 
     sealed class Options
     {
-        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds", "real-names"];
+        static readonly HashSet<string> Flags = ["download-oodle", "with-mods", "install", "force", "remove-single-builds", "real-names", "own-mesh"];
         static readonly HashSet<string> Valued = ["paks", "key", "usmap", "oodle", "out", "only", "project", "from", "id", "name", "description", "category"];
 
         // Kept as typed: row keys, values and paths are case-sensitive. Command words are compared case-insensitively.
