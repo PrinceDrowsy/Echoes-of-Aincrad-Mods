@@ -113,14 +113,24 @@ public sealed record AddedNode(string Asset, string Node, string Kind, Dictionar
 }
 
 /// <summary>
+/// An item the mod adds to the end of a list in an asset, such as a new part's mesh in AvatarMesh_Pupil's AvatarMeshes.
+/// Asset is the asset's /Game path, Field the list's name, and Value the new item, written like an edit's value.
+/// </summary>
+public sealed record ListItem(string Asset, string Field, string Value)
+{
+    [JsonIgnore]
+    public string Label => $"{Asset} / {Field} / {Value}";
+}
+
+/// <summary>
 /// A mod stored as its changes rather than whole game files, so it can be rebuilt on top of a newer game.
 /// The format is documented in the README; keep it stable and bump FormatVersion if it ever has to change.
 /// Format 2 added text edits, format 3 added rows and text, format 4 copied assets, format 5 changed Flow steps, and
-/// format 6 added Flow steps, links and step rules; older files load unchanged.
+/// format 6 added Flow steps, links and step rules, and format 7 list items; older files load unchanged.
 /// </summary>
 public sealed partial class ModProject
 {
-    public const int CurrentFormat = 6;
+    public const int CurrentFormat = 7;
 
     // The patch number in the built file name, which Unreal uses to rank mods: higher wins when two replace the same file.
     // The merged patch takes the top number, so it wins over every mod it was merged from.
@@ -149,6 +159,7 @@ public sealed partial class ModProject
     public List<NodeChange> NodeChanges { get; set; } = [];
     public List<AddedNode> AddedNodes { get; set; } = [];
     public List<NodeRule> NodeRules { get; set; } = [];
+    public List<ListItem> AddedListItems { get; set; } = [];
 
     /// <summary>Every change of every kind.</summary>
     [JsonIgnore]
@@ -160,7 +171,8 @@ public sealed partial class ModProject
 
     /// <summary>Changes made inside the game's own assets.</summary>
     [JsonIgnore]
-    public int AssetChanges => Edits.Count + AddedRows.Count + AddedText.Count + NodeChanges.Count + AddedNodes.Count + NodeRules.Count;
+    public int AssetChanges => Edits.Count + AddedRows.Count + AddedText.Count + NodeChanges.Count + AddedNodes.Count + NodeRules.Count
+                               + AddedListItems.Count;
 
     public static ModProject Load(string path)
     {
@@ -304,6 +316,19 @@ public sealed partial class ModProject
         else
             NodeRules.Add(rule);
     }
+
+    public ListItem? FindListItem(string asset, string field, string value) =>
+        AddedListItems.FirstOrDefault(i => i.Asset.Equals(asset, StringComparison.OrdinalIgnoreCase) && i.Field == field && i.Value == value);
+
+    /// <summary>Adds the item unless the project already adds the same one.</summary>
+    public void SetListItem(ListItem item)
+    {
+        if (FindListItem(item.Asset, item.Field, item.Value) is null)
+            AddedListItems.Add(item);
+    }
+
+    public bool RemoveListItem(string asset, string field, string value) =>
+        FindListItem(asset, field, value) is { } item && AddedListItems.Remove(item);
 
     /// <summary>
     /// The name the built files get: BaseName(), then the priority and _P.

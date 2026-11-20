@@ -155,6 +155,34 @@ public sealed class BuildTests(GameFixture fixture) : IDisposable
     }
 
     [Fact]
+    public void ItemsCanBeAddedToAList()
+    {
+        var game = fixture.Require();
+        fixture.ClearMods();
+        const string list = "/Game/ROD/DataAssets/AvatarParts/Heads/AvatarMesh_Pupil";
+        const string mesh = "/Game/ROD/CHR/Humans/Heads/PUP/SK_CHR_PUP030";
+        JArray Meshes(Game from) => (JArray)JObject.FromObject(from.Provider.LoadPackage(AssetCopier.File(list)).GetExports().First()
+            .Properties.ToDictionary(p => p.Name.Text, p => p.Tag?.GenericValue))["AvatarMeshes"]!;
+        var count = Meshes(game).Count;
+
+        var wrong = new ModProject { Name = "Wrong" };
+        wrong.SetListItem(new ListItem(list, "Meshes", mesh));
+        wrong.SetListItem(new ListItem(list, "AvatarMeshes", "/Game/ROD/CHR/Humans/Heads/PUP/SK_CHR_PUP001"));
+        wrong.SetListItem(new ListItem(list, "AvatarMeshes", "SK_CHR_PUP030"));
+        wrong.SetListItem(new ListItem(list + "x", "AvatarMeshes", mesh));
+        Assert.Equal(4, ModBuilder.Check(game, fixture.Settings, wrong).Count(p => p.Blocks));
+
+        var project = new ModProject { Name = "Pupil" };
+        project.SetListItem(new ListItem(list, "AvatarMeshes", mesh));
+        Assert.Empty(ModBuilder.Check(game, fixture.Settings, project));
+        ModBuilder.Install(game, fixture.Settings, project, false);
+        using var modded = Game.Open(fixture.Settings, true);
+        var meshes = Meshes(modded);
+        Assert.Equal(count + 1, meshes.Count);
+        Assert.Equal(mesh + ".SK_CHR_PUP030", (string?)meshes[^1]!["AssetPathName"]);
+    }
+
+    [Fact]
     public void AFlowStepCanBecomeAnotherKind()
     {
         var game = fixture.Require();

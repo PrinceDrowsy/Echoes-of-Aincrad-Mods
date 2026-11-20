@@ -173,6 +173,40 @@ public sealed class EditableAsset
             map.Value.Add(key, value);
     }
 
+    /// <summary>Checks that an item can be added to a list without changing anything. Returns why not, or null.</summary>
+    public string? Check(ListItem item)
+    {
+        try
+        {
+            Add(item, false);
+            return null;
+        }
+        catch (EditException e)
+        {
+            return e.Message;
+        }
+    }
+
+    public void Apply(ListItem item) => Add(item, true);
+
+    // The new item is a copy of the list's last one with the value set, so it's stored exactly like the game's own.
+    void Add(ListItem item, bool commit)
+    {
+        if (Problem is not null)
+            throw new EditException(Problem);
+        var list = asset.Exports.OfType<NormalExport>().SelectMany(e => e.Data).OfType<ArrayPropertyData>()
+                       .FirstOrDefault(a => a.Name.ToString() == item.Field)
+                   ?? throw new EditException($"{Path.GetFileName(File)} has no list {item.Field}.");
+        if (list.Value.Length == 0)
+            throw new EditException($"{item.Field} is empty, so there's no item to copy the layout of.");
+        var copy = (PropertyData)list.Value[^1].Clone();
+        SetValue(copy, item.Value, true);
+        if (list.Value.Any(v => v.ToString() == copy.ToString()))
+            throw new EditException($"{item.Field} already has {item.Value}.");
+        if (commit)
+            list.Value = [.. list.Value, copy];
+    }
+
     /// <summary>Whether a string table already has a key. Only for string table assets.</summary>
     public bool HasText(string key) => StringTable().ContainsKey(new FString(key));
 

@@ -21,6 +21,8 @@ public sealed record EditProblem(string Change, string Problem, bool Blocks)
 
     public EditProblem(NodeChange change, string problem) : this($"step {change.Label}", problem, true) { }
 
+    public EditProblem(ListItem item, string problem) : this($"new list item {item.Label}", problem, true) { }
+
     public EditProblem(AddedNode added, string problem) : this($"new step {added.Label}", problem, true) { }
 
     public EditProblem(NodeRule rule, string problem, bool blocks = true) : this($"rule {rule.Label}", problem, blocks) { }
@@ -185,7 +187,7 @@ public static class ModBuilder
                 plan.Steps.Add(() => asset.Apply(target, edit));
         }
 
-        EditableAsset? Graph(string package, Action<string> fail)
+        EditableAsset? Package(string package, Action<string> fail)
         {
             var file = package.StartsWith("/Game/") ? AssetCopier.File(package) : null;
             if (file is not null && game.Provider.Files.ContainsKey(file))
@@ -198,7 +200,7 @@ public static class ModBuilder
         var reserved = new List<(AddedNode Added, EditableAsset Asset)>();
         foreach (var added in project.AddedNodes)
         {
-            if (Graph(added.Asset, p => problems.Add(new EditProblem(added, p))) is not { } asset)
+            if (Package(added.Asset, p => problems.Add(new EditProblem(added, p))) is not { } asset)
                 continue;
             if (asset.Reserve(added) is { } problem)
                 problems.Add(new EditProblem(added, problem));
@@ -215,7 +217,7 @@ public static class ModBuilder
 
         foreach (var change in project.NodeChanges)
         {
-            if (Graph(change.Asset, p => problems.Add(new EditProblem(change, p))) is not { } asset)
+            if (Package(change.Asset, p => problems.Add(new EditProblem(change, p))) is not { } asset)
                 continue;
             if (asset.Check(change) is { } problem)
                 problems.Add(new EditProblem(change, problem));
@@ -234,6 +236,16 @@ public static class ModBuilder
                 problems.Add(new EditProblem(rule, $"step {change.Node} in {change.Asset}: {problem}"));
             else
                 plan.Steps.Add(() => asset.Apply(change));
+        }
+
+        foreach (var item in project.AddedListItems)
+        {
+            if (Package(item.Asset, p => problems.Add(new EditProblem(item, p))) is not { } asset)
+                continue;
+            if (asset.Check(item) is { } problem)
+                problems.Add(new EditProblem(item, problem));
+            else
+                plan.Steps.Add(() => asset.Apply(item));
         }
 
         foreach (var text in project.AddedText)

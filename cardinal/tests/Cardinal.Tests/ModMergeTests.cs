@@ -42,6 +42,19 @@ public class ModMergeTests
     }
 
     [Fact]
+    public void ListItemsFromEveryModGoIn()
+    {
+        const string list = "/Game/ROD/DataAssets/AvatarParts/Heads/AvatarMesh_Pupil";
+        var (merged, clashes) = ModMerge.Merge([
+            Mod("A", p => p.SetListItem(new ListItem(list, "AvatarMeshes", "/Game/A/SK_CHR_PUP030"))),
+            Mod("B", p => p.SetListItem(new ListItem(list, "AvatarMeshes", "/Game/B/SK_CHR_PUP031"))),
+            Mod("C", p => p.SetListItem(new ListItem(list, "AvatarMeshes", "/Game/A/SK_CHR_PUP030"))),
+        ]);
+        Assert.Empty(clashes);
+        Assert.Equal(["/Game/A/SK_CHR_PUP030", "/Game/B/SK_CHR_PUP031"], merged.AddedListItems.Select(i => i.Value));
+    }
+
+    [Fact]
     public void TextClashes()
     {
         var (merged, clashes) = ModMerge.Merge([

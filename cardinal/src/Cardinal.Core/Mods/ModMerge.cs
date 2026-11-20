@@ -75,6 +75,9 @@ public static class ModMerge
                 Add(rows, "new step " + added.Label, project.Name, Describe(added.Kind, added.Fields, added.Links));
                 merged.SetAddedNode(added);
             }
+            // Items from different mods all go in, and the same item from two mods goes in once, so lists never clash.
+            foreach (var item in project.AddedListItems)
+                merged.SetListItem(item);
             foreach (var added in project.AddedText)
             {
                 foreach (var (culture, line) in added.Text)
